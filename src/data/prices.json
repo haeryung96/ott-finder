@@ -1,0 +1,21 @@
+{
+  "_comment": "한국 OTT 대여/구매 가격 seed 데이터. TMDB는 금액을 제공하지 않으므로 수동 관리합니다. 아래 값은 예시이며 실제 서비스 가격 확인 후 갱신하세요. 단위: KRW.",
+  "_updatedAt": "2026-07-23",
+  "providers": {
+    "google-play": {
+      "name": "Google Play Movies",
+      "rent": { "new": 5500, "catalog": 2500 },
+      "buy": { "new": 12000, "catalog": 7000 }
+    },
+    "apple-tv": {
+      "name": "Apple TV",
+      "rent": { "new": 5500, "catalog": 1900 },
+      "buy": { "new": 12000, "catalog": 7000 }
+    },
+    "naver-series-on": {
+      "name": "네이버 시리즈온",
+      "rent": { "new": 5500, "catalog": 2500 },
+      "buy": { "new": 12000, "catalog": 7000 }
+    }
+  }
+}
