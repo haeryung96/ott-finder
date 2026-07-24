@@ -48,8 +48,9 @@ export default async function Home({
         <SearchResults query={query} />
       </Suspense>
 
-      <footer className="mt-auto pt-8 text-center text-xs text-gray-400">
-        데이터 제공: TMDB / JustWatch · 개인 학습용 프로젝트
+      <footer className="mt-auto flex flex-col gap-1 pt-8 text-center text-xs text-gray-400">
+        <p>대여·구매 가격은 신작/구작 표준 단가 기반 추정치이며 실제와 다를 수 있어요.</p>
+        <p>데이터 제공: TMDB / JustWatch · 개인 학습용 프로젝트</p>
       </footer>
     </main>
   );

@@ -1,7 +1,9 @@
 import Image from "next/image";
 
+import { BestValueLine } from "@/components/BestValueLine";
 import { ProviderStrip } from "@/components/ProviderStrip";
 import { tmdbImage } from "@/lib/image";
+import { isNewRelease } from "@/lib/pricing";
 import type { SearchItemWithProviders } from "@/types/tmdb";
 
 function title(item: SearchItemWithProviders["item"]): string {
@@ -46,6 +48,7 @@ export function ResultCard({
   const poster = tmdbImage(item.poster_path, "w342");
   const y = year(item);
   const pill = statusPill(providers, subscribedIds);
+  const newRelease = isNewRelease(item.release_date ?? item.first_air_date);
 
   return (
     <li className="group flex flex-col gap-2.5">
@@ -85,6 +88,11 @@ export function ResultCard({
               .join(" · ")}
           </p>
         </div>
+        <BestValueLine
+          providers={providers}
+          subscribedIds={subscribedIds}
+          isNew={newRelease}
+        />
         <ProviderStrip providers={providers} subscribedIds={subscribedIds} />
       </div>
     </li>
