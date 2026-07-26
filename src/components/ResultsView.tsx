@@ -101,11 +101,12 @@ export function ResultsView({
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {visible.map(({ item, providers }) => (
+          {visible.map(({ item, providers, offers }) => (
             <ResultCard
               key={`${item.media_type}-${item.id}`}
               item={item}
               providers={providers}
+              offers={offers}
               subscribedIds={isLoaded ? tmdbIds : undefined}
             />
           ))}

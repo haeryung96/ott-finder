@@ -114,9 +114,9 @@ OTT Finder의 차별점:
   - 카드에 "추정" 명시 + 하단 안내 문구. per-title 실제 금액 아님(무료 API 미제공)
   - 죽은 서비스(네이버 시리즈온, 2024-12 종료) seed 에서 제거
 
-- [x] **v0.2.0 — 무료 경로 반영 + 광고형 요금제 alias** (2026-07-26) — 동작 확인 완료
-  - **무료 경로(free/ads) 버그 수정** — `bestValue()`가 `free`·`ads`를 무시해서 **0원으로 볼 수
-    있는 작품에 "대여 ₩5,500 추정"이 뜨던 버그**. KR에 실제로 영화 free 2,975편 / ads 11,648편,
+- [x] **v0.2.0 — 결정 흐름 완성** (2026-07-26) — 동작 확인 완료
+  - **무료 경로(free/ads) 반영** — `bestValue()`가 `free`·`ads`를 무시해서 **0원으로 볼 수 있는
+    작품에 "대여 ₩5,500 추정"이 뜨던 버그** 수정. KR에 실제로 영화 free 2,975편 / ads 11,648편,
     TV free 176편 / ads 728편이 있어 체감 영향이 컸음.
     우선순위: 내 구독 → free → ads → 대여 → 구매 → 구독 필요 → 없음
     (이미 지불한 구독이 광고 시청보다 낫다고 보고 내 구독을 맨 앞에 유지)
@@ -126,45 +126,71 @@ OTT Finder의 차별점:
   - **광고형 요금제 alias** — `Netflix Standard with Ads`(1796)가 별도 provider_id라
     넷플릭스 구독자가 "구독 필요"를 보던 문제. `ProviderDef.aliasIds`로 대표 서비스에 매핑하고,
     표시할 땐 `dedupeProviders()`로 합쳐 로고·이름이 두 번 뜨지 않게 함.
-  - 배지·정렬·결론 문구가 서로 어긋나 있던 것도 같은 우선순위로 통일.
+  - **상세 페이지 `/title/[mediaType]/[id]`** — `append_to_response=watch/providers,credits`로
+    **1회 호출**. 결론 배너 + 제공처 breakdown(구독/무료/광고형/대여/구매) + 줄거리 + 감독·출연.
+    movie/tv 응답 차이는 `TitleDetail`로 정규화. `generateMetadata`로 작품별 메타데이터.
+  - **"보러 가기"** — TMDB의 `link`는 provider 딥링크가 아니라 themoviedb.org 경유 페이지임을
+    확인. `data/watch-links.json` seed(서비스 검색 URL)로 직접 이동, 없으면 TMDB link로 폴백.
 
-- [x] **v0.3.0 — 상세 페이지 + 진짜 딥링크** (2026-07-26) — 동작 확인 완료
+- [x] **v0.3.0 — 진짜 딥링크 + 실제 가격** (2026-07-26) — 동작 확인 완료
   - v0.2.0의 "무료 API로는 per-title 딥링크 불가"는 **틀린 결론이었음.** 정확히는
     *TMDB만으로는* 불가. TMDB watch 페이지 HTML 안에 이미 JustWatch 클릭 URL로 감싼
     진짜 딥링크가 있었고, JustWatch GraphQL(`apis.justwatch.com/graphql`)로 정식 조회 가능.
   - **딥링크 확보** — `netflix.com/title/81040344`, `tving.com/contents/P001782817`,
     `wavve.com/player/movie?movieid=...`, `watcha.com/contents/mW4L2XW`
-  - **실제 대여/구매가도 나옴** — 추정치 오차가 컸다:
+  - **실제 대여/구매가 확보 — 이게 딥링크보다 큼.** 추정치 오차가 컸다:
     인셉션 대여 추정 ₩2,500 → 실제 **₩1,320**, 구매 추정 ₩7,700 → 실제 **₩4,950**
-    (상세 페이지에 우선 반영. 검색 카드·조합 계산은 v0.4.0에서)
   - **매칭은 fuzzy 하지 않음** — JustWatch에 TMDB id 직접 조회 필드가 없어(`nodeByExternalId`
     미존재) 제목으로 검색하지만, `externalIds.tmdbId` + `objectType`으로 **정확히 대조**한다.
     ("오징어 게임" 검색 시 딸려오는 더 챌린지/이야기/벽난로가 id로 정확히 걸러짐)
   - **packageId == TMDB provider_id** — TMDB가 JustWatch에서 provider 데이터를 받아오기
     때문. 7개 서비스 전부 일치 확인 → 별도 매핑 테이블 없이 `lib/providers.ts`에 그대로 붙음
   - **폴백 설계** — `lib/justwatch.ts`는 **어떤 실패에서도 예외를 던지지 않고 null 반환**
-    (5초 타임아웃, 스키마 변경, 차단, 매칭 실패 모두). 엔드포인트를 죽여서 실제로 검증함.
-  - **상세 페이지 `/title/[mediaType]/[id]`** — `append_to_response=watch/providers,credits`로
-    **1회 호출**. 결론 배너 + 제공처 breakdown + 줄거리 + 감독·출연. `generateMetadata` 지원.
+    (5초 타임아웃, 스키마 변경, 차단, 매칭 실패 모두). 호출부는 null이면 v0.2.0 동작
+    (검색 URL + 표준 단가 추정치)으로 자동 강등. 엔드포인트를 죽여서 실제로 검증함.
 
   ⚠️ **비공식 API 의존** — `apis.justwatch.com/graphql`은 문서화돼 있지 않고
   introspection도 막혀 있다(`introspection disabled`). 레이트 리밋도 공개된 값이 없다.
+  언제든 깨질 수 있다는 전제로 폴백을 넣었으므로, 깨지면 앱은 v0.2.0 수준으로 동작한다.
   개인 학습·포트폴리오 용도라는 전제에서의 선택이며, 상업적 이용은 약관 위반이다.
   (공식 대안 Watchmode는 무료 티어 월 2,500콜/3개국 — 현재 구조엔 쿼터가 부족)
 
-### v0.3.0에서 확인 후 **의도적으로 뺀 것**
+- [x] **v0.4.0 — 추정치 폐기, 실제 데이터만** (2026-07-26) — 동작 확인 완료
+  - **원칙 변경: 추정치를 표시하지 않는다.** 의사결정 도구에서 틀린 숫자는 숫자가 없는 것보다
+    나쁘다. 실제 가격을 모르면 **금액 없이 경로만** 알린다 ("대여 가능", "대여로 볼 수 있어요").
+  - `src/data/prices.json` **삭제** — 표준 단가 tier 추정 체계 전체 제거.
+    `estimatePrice()` / `tierLabel()` / `isNewRelease()` 도 함께 제거. (필요하면 git 이력에서 복구)
+  - `bestValue()` 시그니처 변경: `isNew: boolean` → `offers?: JwOffer[] | null`.
+    `BestValue` 의 rent/buy 가 `estimate: number` → `price: number | null` 로 바뀜.
+  - **대여 vs 구매를 실제로 비교** — 실측가를 알게 되니 "무조건 대여 우선"이 틀릴 수 있음
+    (구작은 구매가 더 싼 경우가 있음). 둘 다 금액을 알면 진짜 싼 쪽을 고른다.
+  - **검색 카드도 실제가** — `searchWithProviders()` 가 항목당 TMDB + JustWatch 를 병렬 조회.
+    카드와 상세 페이지의 가격 불일치 해소 (인셉션: 양쪽 다 ₩1,320).
+    실측: 20건 동시 호출 **0.48초, 실패 0건, 레이트 리밋 없음**.
+  - **조합 계산도 실제가** — `/api/bundle` 이 작품별 실측 대여/구매가로 총비용을 계산.
+    가격을 못 구한 작품은 **총액에서 제외하고 `unknownPriceCount` 로 따로 보고**한다.
+    이때 화면은 총액을 "최소 ₩N +α" 로 표시해 확정 금액이 아님을 명시.
+  - 폴백 재검증(엔드포인트를 죽여서): 카드 "대여 가능", 상세 "추정치 대신 금액을 표시하지
+    않습니다", 조합 `price: null` + `unknownPriceCount: 1` — **추정치가 새어나오는 곳 없음.**
+
+**다음 할 일:**
+- [ ] **JustWatch 실패를 감지할 방법이 없음** — 지금은 조용히 금액만 사라진다.
+      실패율 로깅/알림이 없으면 스키마가 바뀌어도 한동안 모른다. 우선순위 높음
+- [ ] **테스트 없음** — `bundle.ts`(set cover)·`pricing.ts`는 순수 함수라 vitest 도입 1순위.
+      JustWatch 응답 파싱도 고정 fixture 로 테스트해두면 스키마 변경을 바로 잡을 수 있음
+- [ ] 구독 월정액(`subscriptions.json`)은 **여전히 수동 관리 seed** — 유일하게 남은 비실측
+      데이터. 요금제 개편 때 갱신 필요 (JustWatch 는 구독 월정액을 주지 않음)
+- [ ] 검색 응답이 항목당 2개 API 를 타므로 느려질 수 있음 — 스트리밍/부분 렌더 검토
+- [ ] (개선) 검색 디바운스/자동완성, 페이지네이션(현재 20건 고정)
+- [ ] README가 create-next-app 기본값 그대로 / 배포 안 됨
+- [ ] (확장) 탐색 피드(discover), "이번 달 얼마 아꼈나" 대시보드
+
+### v0.2.0에서 확인 후 **의도적으로 뺀 것**
 - **시즌별 제공처** — `/tv/{id}/season/{n}/watch/providers`는 200을 주지만 KR 응답이
   시리즈 레벨과 **동일**(link까지 같음)해서 정보량이 0. 호출만 늘어나 제외.
 - **Disney+ / Coupang Play 검색 링크** — Disney+는 `/search`가 404, Coupang Play는
   SPA catch-all이라 파라미터 이름을 확정할 수 없었음. 추측 대신 TMDB link 폴백.
-
-**다음 할 일:**
-- [ ] **검색 카드와 상세 페이지의 가격이 불일치** — 카드는 아직 추정치, 상세는 실제가
-- [ ] **조합 계산(`/api/bundle`)도 아직 추정치** — 위시리스트는 소수라 실제가를 쓰기 좋음
-- [ ] JustWatch 레이트 리밋 파악 + 실패율 로깅 (지금은 조용히 폴백만 함)
-- [ ] (개선) 검색 디바운스/자동완성
-- [ ] prices.json 실제 가격 검증/갱신
-- [ ] (확장) "이번 달 얼마 아꼈나" 대시보드
+  (`watch-links.json`의 `verified` 플래그에 근거를 남김)
 
 ### UI 디자인 방향 (적용됨)
 - 컨셉: JustWatch풍 **포스터 그리드**, 색은 절제(중립 회색 + 강조색 1개 = 에메랄드)
@@ -182,20 +208,35 @@ OTT Finder의 차별점:
 ```
 src/
   app/
-    api/search/route.ts      # 통합 검색 프록시 (?q=)
-    api/providers/route.ts   # KR 제공처 목록 (ID 검증용)
+    api/search/route.ts             # 통합 검색 프록시 (?q=)
+    api/providers/route.ts          # KR 제공처 목록 (ID 검증용)
+    api/bundle/route.ts             # 위시리스트 → 최적 구독 조합
+    title/[mediaType]/[id]/page.tsx # 작품 상세 (v0.2.0)
+    settings/  watchlist/
     layout.tsx  page.tsx
   lib/
     tmdb.ts                  # 서버 전용 TMDB 클라이언트 (검색·상세·제공처)
     justwatch.ts             # 서버 전용 · 딥링크+실제가 (v0.3.0, 실패 시 null)
     offers.ts                # JustWatch 오퍼 순수 헬퍼 (클라이언트 공용)
     providers.ts             # 국내 OTT 상수 + alias 매핑 + dedupeProviders()
-    watchLink.ts             # 검색 URL 폴백 링크
-  app/title/[mediaType]/[id]/page.tsx   # 작품 상세 (v0.3.0)
+    pricing.ts               # bestValue() — "가장 싸게 보는 법" 판정 (실측가만)
+    bundle.ts                # 구독 조합 최적화 (weighted set cover 완전탐색)
+    watchLink.ts             # 검색 URL 폴백 링크 (v0.2.0)
+    image.ts
+  hooks/                     # useSubscriptions, useWatchlist (localStorage)
   types/tmdb.ts  types/justwatch.ts
-  data/prices.json           # 대여/구매 가격 seed (수동 관리)
-  data/watch-links.json      # 서비스 검색 URL 템플릿
+  data/
+    subscriptions.json       # 구독 월정액 카탈로그 (남은 유일한 수동 seed)
+    watch-links.json         # 딥링크 실패 시 쓰는 서비스 검색 URL 템플릿
 ```
+
+### 데이터 출처 (v0.4.0 기준)
+| 데이터 | 출처 | 성격 |
+|---|---|---|
+| 작품 메타·검색·제공처 | TMDB | 실측 |
+| 대여/구매 **가격** | JustWatch | **실측** (모르면 표시 안 함) |
+| per-title **딥링크** | JustWatch | **실측** (없으면 서비스 검색 URL) |
+| 구독 월정액 | `subscriptions.json` | 수동 관리 seed |
 
 ---
 

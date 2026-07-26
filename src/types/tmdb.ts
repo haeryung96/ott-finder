@@ -1,5 +1,7 @@
 // TMDB API 응답 타입 (필요한 필드만 정의)
 
+import type { JwOffer } from "@/types/justwatch";
+
 export type MediaType = "movie" | "tv";
 
 /** /search/multi 결과 항목 */
@@ -49,10 +51,12 @@ export interface TmdbWatchProvidersResponse {
   results: Record<string, TmdbRegionProviders>;
 }
 
-/** 검색 결과 + 해당 지역 제공처를 묶은 항목 (서버→클라이언트 전달용) */
+/** 검색 결과 + 해당 지역 제공처 + JustWatch 실측 오퍼 (서버→클라이언트 전달용) */
 export interface SearchItemWithProviders {
   item: TmdbSearchResult;
   providers?: TmdbRegionProviders;
+  /** 실제 가격·딥링크. 조회 실패 시 null/undefined → 금액을 표시하지 않음 */
+  offers?: JwOffer[] | null;
 }
 
 // ── 상세 (append_to_response=watch/providers,credits) ────────────────────────

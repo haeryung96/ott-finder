@@ -4,15 +4,16 @@
 // 완전 탐색해 **정확 최적해**를 구한다(greedy 근사 아님).
 //
 // 목적 함수(= "이번 달" 총비용):
-//   Σ(선택한 구독 월정액)  +  Σ(구독으로 커버 안 되는 작품의 대여/구매 추정치)
+//   Σ(선택한 구독 월정액)  +  Σ(구독으로 커버 안 되는 작품의 대여/구매 **실제가**)
 // 무료(free)·광고형(ads)으로 볼 수 있는 작품은 어떤 조합에서도 0원이라 최적화 대상에서
 // 미리 제외한다 (optimizeBundle 의 watchFree).
 // recurring(구독)과 one-time(대여)을 "이번 달에 한 번 다 본다"는 가정으로 비교한다.
-// 대여/구매가는 pricing.ts 표준 단가 추정치라 정확값이 아니지만, 구독 월정액은
-// 공개·안정적이므로 조합 판단의 근거는 대체로 견고하다.
+//
+// v0.4.0: 대여/구매가를 JustWatch 실측가로 바꿨다 (이전엔 표준 단가 추정치).
+// 실제 가격을 못 구한 작품은 **비용 계산에서 제외하고 unknownPriceCount 로 따로 보고**한다.
+// 추정치로 메우면 총액과 추천 조합이 조용히 틀어지므로, 모르는 건 모른다고 말한다.
 
 import subscriptionsData from "@/data/subscriptions.json";
-import { estimatePrice } from "@/lib/pricing";
 import type { MediaType } from "@/types/tmdb";
 
 export interface SubscriptionCatalogEntry {
@@ -32,11 +33,14 @@ export interface BundleTitle {
   mediaType: MediaType;
   title: string;
   poster: string | null;
-  isNew: boolean;
   /** 이 작품을 구독형으로 제공하는, 카탈로그에 등록된 서비스 슬러그들 */
   flatrateSlugs: string[];
   canRent: boolean;
   canBuy: boolean;
+  /** JustWatch 실측 대여가(KRW). 모르면 null */
+  rentPrice: number | null;
+  /** JustWatch 실측 구매가(KRW). 모르면 null */
+  buyPrice: number | null;
   /** 구독 없이 0원으로 볼 수 있는 경로 (free=무료, ads=광고형). 없으면 null */
   freeKind: "free" | "ads" | null;
   /** freeKind 가 있을 때 그 무료 제공처 이름들 (표시용) */
@@ -56,7 +60,8 @@ export interface CoveredPlan {
 export interface RentPlan {
   title: BundleTitle;
   kind: "rent" | "buy";
-  estimate: number;
+  /** JustWatch 실측가. 가격 미상이면 null (총액에 포함되지 않음) */
+  price: number | null;
 }
 
 interface SubsetEval {
@@ -68,6 +73,25 @@ interface SubsetEval {
   total: number;
   covered: CoveredPlan[];
   rent: RentPlan[];
+  /** 대여/구매는 되는데 실제 가격을 못 구한 작품 수 (총액에서 빠짐) */
+  unknownPriceCount: number;
+}
+
+/** 대여/구매 중 실제로 더 싼 쪽. 둘 다 모르면 null */
+function cheapestPaid(
+  t: BundleTitle,
+): { kind: "rent" | "buy"; price: number | null } | null {
+  const options: { kind: "rent" | "buy"; price: number | null }[] = [];
+  if (t.canRent) options.push({ kind: "rent", price: t.rentPrice });
+  if (t.canBuy) options.push({ kind: "buy", price: t.buyPrice });
+  if (options.length === 0) return null;
+
+  const priced = options.filter((o) => o.price !== null);
+  if (priced.length > 0) {
+    return priced.reduce((a, b) => (b.price! < a.price! ? b : a));
+  }
+  // 경로는 있는데 가격을 모름 — 대여를 우선 표기하되 금액은 null
+  return options[0];
 }
 
 /** 국내 어떤 경로로도 볼 수 없는 작품(무료·구독·대여·구매 모두 없음) */
@@ -94,20 +118,22 @@ function evalSubset(watchable: BundleTitle[], chosen: Set<string>): SubsetEval {
   const covered: CoveredPlan[] = [];
   const rent: RentPlan[] = [];
   let rentalCost = 0;
+  let unknownPriceCount = 0;
   let feasible = true;
 
   for (const t of watchable) {
     const via = t.flatrateSlugs.filter((s) => chosen.has(s));
     if (via.length > 0) {
       covered.push({ title: t, via });
-    } else if (t.canRent) {
-      const estimate = estimatePrice("rent", t.isNew);
-      rent.push({ title: t, kind: "rent", estimate });
-      rentalCost += estimate;
-    } else if (t.canBuy) {
-      const estimate = estimatePrice("buy", t.isNew);
-      rent.push({ title: t, kind: "buy", estimate });
-      rentalCost += estimate;
+      continue;
+    }
+
+    const paid = cheapestPaid(t);
+    if (paid) {
+      rent.push({ title: t, kind: paid.kind, price: paid.price });
+      // 가격을 모르는 작품은 총액에 넣지 않는다 (추정치로 메우지 않음)
+      if (paid.price !== null) rentalCost += paid.price;
+      else unknownPriceCount += 1;
     } else {
       // 구독으로만 볼 수 있는데(=flatrate 있음) 이 조합이 안 덮음 → 실현 불가
       feasible = false;
@@ -121,6 +147,7 @@ function evalSubset(watchable: BundleTitle[], chosen: Set<string>): SubsetEval {
     total: feasible ? monthlyCost + rentalCost : Infinity,
     covered,
     rent,
+    unknownPriceCount,
   };
 }
 
@@ -131,6 +158,11 @@ export interface BundleResult {
     rentalCost: number;
     totalThisMonth: number;
     coveredCount: number;
+    /**
+     * 총액에 반영되지 못한 '가격 미상' 작품 수.
+     * 0 보다 크면 totalThisMonth 는 **하한선**이지 확정 금액이 아니다.
+     */
+    unknownPriceCount: number;
   };
   coveredBySubscription: CoveredPlan[];
   rentSeparately: RentPlan[];
@@ -224,6 +256,7 @@ export function optimizeBundle(
       rentalCost: ev.rentalCost,
       totalThisMonth: ev.total,
       coveredCount: ev.covered.length,
+      unknownPriceCount: ev.unknownPriceCount,
     },
     coveredBySubscription: ev.covered,
     rentSeparately: ev.rent,

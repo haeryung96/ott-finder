@@ -1,5 +1,6 @@
-import { bestValue, formatKRW, tierLabel } from "@/lib/pricing";
+import { bestValue, formatKRW } from "@/lib/pricing";
 import { dedupeProviders } from "@/lib/providers";
+import type { JwOffer } from "@/types/justwatch";
 import type { TmdbProvider, TmdbRegionProviders } from "@/types/tmdb";
 
 /** 요금제 변형을 합친 뒤 최대 max 개까지 표기 */
@@ -10,17 +11,20 @@ function names(list: TmdbProvider[], max = 2): string {
   return extra > 0 ? `${shown.join(", ")} 외 ${extra}` : shown.join(", ");
 }
 
-/** 카드에 표시되는 "가장 싸게 보는 법" 한 줄 결론 */
+/**
+ * 카드에 표시되는 "가장 싸게 보는 법" 한 줄 결론.
+ * 금액은 JustWatch 실측가만 쓰고, 모르면 숫자 없이 경로만 알린다.
+ */
 export function BestValueLine({
   providers,
   subscribedIds,
-  isNew,
+  offers,
 }: {
   providers?: TmdbRegionProviders;
   subscribedIds?: Set<number>;
-  isNew: boolean;
+  offers?: JwOffer[] | null;
 }) {
-  const bv = bestValue(providers, subscribedIds ?? new Set(), isNew);
+  const bv = bestValue(providers, subscribedIds ?? new Set(), offers);
 
   if (bv.kind === "unavailable") return null;
 
@@ -56,16 +60,19 @@ export function BestValueLine({
     );
   }
 
-  // rent / buy — 표준 단가 기반 추정
+  // rent / buy — 실측가가 있으면 금액을, 없으면 경로만
   const kindLabel = bv.kind === "rent" ? "대여" : "구매";
   return (
-    <p
-      className="text-xs font-medium text-gray-700 dark:text-gray-300"
-      title={`${tierLabel(bv.isNew)} 표준 단가 기반 추정치입니다. 실제 가격과 다를 수 있어요.`}
-    >
-      {kindLabel} <span className="font-semibold">{formatKRW(bv.estimate)}</span>
-      <span className="font-normal text-gray-400"> 추정</span> ·{" "}
-      {names(bv.providers)}
+    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+      {bv.price !== null ? (
+        <>
+          {kindLabel}{" "}
+          <span className="font-semibold">{formatKRW(bv.price)}</span>
+        </>
+      ) : (
+        <span title="실시간 가격을 불러오지 못했어요">{kindLabel} 가능</span>
+      )}{" "}
+      · {names(bv.providers)}
     </p>
   );
 }

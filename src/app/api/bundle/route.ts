@@ -3,7 +3,8 @@ import {
   type BundleResult,
   type BundleTitle,
 } from "@/lib/bundle";
-import { isNewRelease } from "@/lib/pricing";
+import { getJustWatchOffers } from "@/lib/justwatch";
+import { minPrice } from "@/lib/offers";
 import { providerById } from "@/lib/providers";
 import { getWatchProviders, TmdbConfigError } from "@/lib/tmdb";
 import type { MediaType } from "@/types/tmdb";
@@ -64,6 +65,14 @@ export async function POST(request: Request) {
         let freeKind: "free" | "ads" | null = null;
         let freeProviderNames: string[] = [];
 
+        // 실제 대여/구매가는 JustWatch 에서 (실패하면 null → 총액에서 제외)
+        const offers = await getJustWatchOffers(
+          it.id,
+          it.mediaType,
+          it.title,
+          region,
+        ).catch(() => null);
+
         try {
           const wp = await getWatchProviders(it.mediaType, it.id);
           const rp = wp.results?.[region];
@@ -97,10 +106,11 @@ export async function POST(request: Request) {
           mediaType: it.mediaType,
           title: it.title,
           poster: it.poster ?? null,
-          isNew: isNewRelease(it.releaseDate),
           flatrateSlugs,
           canRent,
           canBuy,
+          rentPrice: minPrice(offers, "rent"),
+          buyPrice: minPrice(offers, "buy"),
           freeKind,
           freeProviderNames,
         };

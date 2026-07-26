@@ -7,7 +7,6 @@ import { TitleDecision } from "@/components/TitleDecision";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { tmdbImage } from "@/lib/image";
 import { getJustWatchOffers } from "@/lib/justwatch";
-import { isNewRelease } from "@/lib/pricing";
 import { getTitleDetail, TmdbConfigError, TmdbNotFoundError } from "@/lib/tmdb";
 import type { MediaType, TitleDetail } from "@/types/tmdb";
 
@@ -102,7 +101,6 @@ export default async function TitlePage({ params }: Params) {
   const detail = result.detail;
   const poster = tmdbImage(detail.posterPath, "w342");
   const backdrop = tmdbImage(detail.backdropPath, "w500");
-  const isNew = isNewRelease(detail.releaseDate);
 
   const facts = [
     detail.year,
@@ -198,11 +196,10 @@ export default async function TitlePage({ params }: Params) {
         </header>
 
         {/* 결론 + 제공처 (내 구독에 따라 달라져 클라이언트에서 계산).
-            jwOffers 는 실패 시 null 이며, 그때는 추정치 + 검색 URL 로 폴백된다. */}
+            jwOffers 가 null 이면 금액 없이 시청 경로 + 검색 URL 로 폴백된다. */}
         <TitleDecision
           title={detail.title}
           providers={detail.providers}
-          isNew={isNew}
           jwOffers={await getJustWatchOffers(
             detail.id,
             detail.mediaType,
@@ -250,8 +247,8 @@ export default async function TitlePage({ params }: Params) {
         <footer className="border-t border-gray-200 pt-5 text-xs text-gray-400 dark:border-gray-800">
           <p>
             &ldquo;바로 보기&rdquo;는 해당 서비스의 작품 페이지로 직접
-            이동합니다. 링크나 실시간 가격을 못 불러온 경우엔 &ldquo;보러
-            가기&rdquo;(서비스 검색)와 표준 단가 추정치로 대체돼요.
+            이동합니다. 딥링크를 못 불러온 경우엔 &ldquo;보러 가기&rdquo;(서비스
+            검색)로 대체돼요.
           </p>
           <p className="mt-1">데이터 제공: TMDB / JustWatch · 개인 학습용 프로젝트</p>
         </footer>

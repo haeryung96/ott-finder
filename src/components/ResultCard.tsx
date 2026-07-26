@@ -5,7 +5,6 @@ import { BestValueLine } from "@/components/BestValueLine";
 import { ProviderStrip } from "@/components/ProviderStrip";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { tmdbImage } from "@/lib/image";
-import { isNewRelease } from "@/lib/pricing";
 import type { SearchItemWithProviders } from "@/types/tmdb";
 
 function title(item: SearchItemWithProviders["item"]): string {
@@ -48,12 +47,12 @@ function statusPill(
 export function ResultCard({
   item,
   providers,
+  offers,
   subscribedIds,
 }: SearchItemWithProviders & { subscribedIds?: Set<number> }) {
   const poster = tmdbImage(item.poster_path, "w342");
   const y = year(item);
   const pill = statusPill(providers, subscribedIds);
-  const newRelease = isNewRelease(item.release_date ?? item.first_air_date);
   const href = `/title/${item.media_type}/${item.id}`;
 
   return (
@@ -116,7 +115,7 @@ export function ResultCard({
         <BestValueLine
           providers={providers}
           subscribedIds={subscribedIds}
-          isNew={newRelease}
+          offers={offers}
         />
         <ProviderStrip providers={providers} subscribedIds={subscribedIds} />
       </div>

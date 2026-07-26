@@ -25,7 +25,9 @@ function Poster({
 }
 
 function rentLabel(r: RentPlan): string {
-  return `${r.kind === "rent" ? "대여" : "구매"} ${formatKRW(r.estimate)} 추정`;
+  const kind = r.kind === "rent" ? "대여" : "구매";
+  // 실제 가격을 모르면 추정치로 메우지 않고 그대로 알린다
+  return r.price !== null ? `${kind} ${formatKRW(r.price)}` : `${kind} · 가격 미상`;
 }
 
 /** /api/bundle 결과를 "결정" 카드로 렌더 (순수 표시 컴포넌트) */
@@ -68,11 +70,23 @@ export function BundleResultView({ result }: { result: BundleResult }) {
         </p>
 
         <div className="mt-3 flex items-baseline gap-2 border-t border-emerald-200/70 pt-3 dark:border-emerald-900">
-          <span className="text-sm text-gray-500">이번 달 총액</span>
+          <span className="text-sm text-gray-500">
+            이번 달 총액{recommended.unknownPriceCount > 0 && " (최소)"}
+          </span>
           <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
             {formatKRW(recommended.totalThisMonth)}
+            {recommended.unknownPriceCount > 0 && (
+              <span className="text-base font-semibold"> +α</span>
+            )}
           </span>
         </div>
+
+        {recommended.unknownPriceCount > 0 && (
+          <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+            {recommended.unknownPriceCount}편은 실시간 가격을 못 불러와 총액에서
+            빠졌어요. 추정치로 채우지 않았으니 실제 지출은 이보다 큽니다.
+          </p>
+        )}
 
         {result.savings > 0 && (
           <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
@@ -179,7 +193,7 @@ export function BundleResultView({ result }: { result: BundleResult }) {
       </div>
 
       <p className="text-xs text-gray-400">
-        구독 월정액은 표준 요금제 기준, 대여·구매가는 신작/구작 표준 단가 추정치예요.
+        대여·구매가는 JustWatch 실시간 가격이고, 구독 월정액은 표준 요금제 기준이에요.
         &ldquo;이번 달에 위시리스트를 모두 본다&rdquo;는 가정으로 계산합니다.{" "}
         <Link href="/settings" className="underline underline-offset-2">
           내 구독 설정

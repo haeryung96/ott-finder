@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getJustWatchOffers } from "@/lib/justwatch";
 import type {
   MediaType,
   SearchItemWithProviders,
@@ -94,8 +95,13 @@ export async function getWatchProviders(
 }
 
 /**
- * 검색 결과 각각에 대해 지역 제공처를 병렬로 붙여서 반환.
- * 제공처 조회에 실패한 항목은 providers 없이 그대로 포함.
+ * 검색 결과 각각에 지역 제공처와 JustWatch 실측 오퍼(실제 가격)를 병렬로 붙여 반환.
+ *
+ * 제공처 조회에 실패한 항목은 providers 없이, JustWatch 조회에 실패한 항목은
+ * offers 없이 그대로 포함한다 (offers 가 없으면 화면에서 금액을 표시하지 않는다).
+ *
+ * 호출량: 항목당 TMDB 1회 + JustWatch 1회. 20건 동시 호출을 실측했을 때
+ * JustWatch 는 0.5초 내에 전부 응답했고 레이트 리밋도 걸리지 않았다 (2026-07-26).
  */
 export async function searchWithProviders(
   query: string,
@@ -106,12 +112,19 @@ export async function searchWithProviders(
   const top = results.slice(0, limit);
   return Promise.all(
     top.map(async (item) => {
-      try {
-        const wp = await getWatchProviders(item.media_type as MediaType, item.id);
-        return { item, providers: wp.results?.[region] };
-      } catch {
-        return { item };
-      }
+      const mediaType = item.media_type as MediaType;
+      const title = item.title ?? item.name ?? "";
+
+      const [providers, offers] = await Promise.all([
+        getWatchProviders(mediaType, item.id)
+          .then((wp) => wp.results?.[region])
+          .catch(() => undefined),
+        title
+          ? getJustWatchOffers(item.id, mediaType, title, region)
+          : Promise.resolve(null),
+      ]);
+
+      return { item, providers, offers };
     }),
   );
 }

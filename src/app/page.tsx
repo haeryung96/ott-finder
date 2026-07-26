@@ -49,7 +49,7 @@ export default async function Home({
       </Suspense>
 
       <footer className="mt-auto flex flex-col gap-1 pt-8 text-center text-xs text-gray-400">
-        <p>대여·구매 가격은 신작/구작 표준 단가 기반 추정치이며 실제와 다를 수 있어요.</p>
+        <p>대여·구매 가격은 JustWatch 실시간 가격이에요. 못 불러온 경우엔 추정치 대신 금액을 표시하지 않습니다.</p>
         <p>데이터 제공: TMDB / JustWatch · 개인 학습용 프로젝트</p>
       </footer>
     </main>

@@ -5,13 +5,7 @@ import Link from "next/link";
 
 import { useSubscriptions } from "@/hooks/useSubscriptions";
 import { tmdbImage } from "@/lib/image";
-import {
-  bestValue,
-  estimatePrice,
-  formatKRW,
-  tierLabel,
-  type BestValue,
-} from "@/lib/pricing";
+import { bestValue, formatKRW, type BestValue } from "@/lib/pricing";
 import { minPrice, offerKey, toOfferMap } from "@/lib/offers";
 import { dedupeProviders } from "@/lib/providers";
 import { watchLink } from "@/lib/watchLink";
@@ -25,14 +19,8 @@ function names(list: TmdbProvider[]): string {
     .join(", ");
 }
 
-/**
- * 결론 한 줄 + 색상 톤.
- * @param realPrice JustWatch 실측가 (있으면 추정치 대신 사용)
- */
-function headline(
-  bv: BestValue,
-  realPrice: number | null,
-): { text: string; sub: string; tone: string } {
+/** 결론 한 줄 + 색상 톤. 금액은 실측가가 있을 때만 붙는다. */
+function headline(bv: BestValue): { text: string; sub: string; tone: string } {
   switch (bv.kind) {
     case "subscription-free":
       return {
@@ -54,22 +42,22 @@ function headline(
       };
     case "rent":
       return {
-        text: realPrice
-          ? `대여가 가장 싸요 · ${formatKRW(realPrice)}`
-          : `대여가 가장 싸요 · ${formatKRW(bv.estimate)} 추정`,
-        sub: realPrice
+        text: bv.price !== null
+          ? `대여가 가장 싸요 · ${formatKRW(bv.price)}`
+          : "대여로 볼 수 있어요",
+        sub: bv.price !== null
           ? `${names(bv.providers)} · JustWatch 실시간 가격`
-          : `${names(bv.providers)} · ${tierLabel(bv.isNew)} 표준 단가 기준`,
+          : `${names(bv.providers)} · 실시간 가격을 불러오지 못했어요`,
         tone: "amber",
       };
     case "buy":
       return {
-        text: realPrice
-          ? `구매만 가능해요 · ${formatKRW(realPrice)}`
-          : `구매만 가능해요 · ${formatKRW(bv.estimate)} 추정`,
-        sub: realPrice
+        text: bv.price !== null
+          ? `구매가 가장 싸요 · ${formatKRW(bv.price)}`
+          : "구매로 볼 수 있어요",
+        sub: bv.price !== null
           ? `${names(bv.providers)} · JustWatch 실시간 가격`
-          : `${names(bv.providers)} · ${tierLabel(bv.isNew)} 표준 단가 기준`,
+          : `${names(bv.providers)} · 실시간 가격을 불러오지 못했어요`,
         tone: "amber",
       };
     case "subscription-needed":
@@ -106,28 +94,29 @@ const SECTIONS = [
 export function TitleDecision({
   title,
   providers,
-  isNew,
   jwOffers,
 }: {
   title: string;
   providers?: TmdbRegionProviders;
-  isNew: boolean;
-  /** JustWatch 실측 오퍼. null 이면 추정치 + 검색 URL 로 폴백 */
+  /** JustWatch 실측 오퍼. null 이면 금액 없이 시청 경로만 표시 */
   jwOffers?: JwOffer[] | null;
 }) {
   const { tmdbIds, isLoaded, slugs } = useSubscriptions();
 
   // 하이드레이션 전에는 구독 정보를 모르므로 빈 Set 으로 계산했다가 로드 후 갱신됨
-  const bv = bestValue(providers, isLoaded ? tmdbIds : new Set<number>(), isNew);
+  const bv = bestValue(
+    providers,
+    isLoaded ? tmdbIds : new Set<number>(),
+    jwOffers,
+  );
+  const { text, sub, tone } = headline(bv);
 
   const offerMap = toOfferMap(jwOffers);
-  const realPrice =
-    bv.kind === "rent" || bv.kind === "buy" ? minPrice(jwOffers, bv.kind) : null;
-  const { text, sub, tone } = headline(bv, realPrice);
-
   const hasAnySection = SECTIONS.some(
     (s) => (providers?.[s.key]?.length ?? 0) > 0,
   );
+  const hasPaidPath =
+    (providers?.rent?.length ?? 0) > 0 || (providers?.buy?.length ?? 0) > 0;
   const hasRealPrices =
     minPrice(jwOffers, "rent") !== null || minPrice(jwOffers, "buy") !== null;
 
@@ -169,15 +158,11 @@ export function TitleDecision({
                     <span className="text-xs text-gray-400">{section.hint}</span>
                   )}
                   {(section.key === "rent" || section.key === "buy") &&
-                    (minPrice(jwOffers, section.key) !== null ? (
+                    minPrice(jwOffers, section.key) !== null && (
                       <span className="text-xs text-gray-400">
                         최저 {formatKRW(minPrice(jwOffers, section.key)!)}
                       </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">
-                        {formatKRW(estimatePrice(section.key, isNew))} 추정
-                      </span>
-                    ))}
+                    )}
                 </div>
                 <ul className="flex flex-col gap-1.5">
                   {dedupeProviders(list).map((p) => (
@@ -202,8 +187,7 @@ export function TitleDecision({
       )}
 
       {/* 대여/구매 경로가 실제로 있을 때만 가격 출처 고지 */}
-      {((providers?.rent?.length ?? 0) > 0 ||
-        (providers?.buy?.length ?? 0) > 0) &&
+      {hasPaidPath &&
         (hasRealPrices ? (
           <p className="text-xs text-gray-400">
             대여·구매 금액은 JustWatch 실시간 가격이에요. 화질(SD/HD/UHD)에 따라
@@ -211,8 +195,8 @@ export function TitleDecision({
           </p>
         ) : (
           <p className="text-xs text-gray-400">
-            실시간 가격을 불러오지 못해 {tierLabel(isNew)} 표준 단가 기반
-            추정치를 표시했어요. 실제 가격과 다를 수 있어요.
+            실시간 가격을 불러오지 못했어요. 추정치 대신 금액을 표시하지 않습니다
+            — 각 서비스에서 직접 확인해 주세요.
           </p>
         ))}
     </div>

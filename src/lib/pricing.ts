@@ -1,39 +1,15 @@
-// "가장 싸게 보는 법" 계산 (클라이언트/서버 공용, 순수 함수).
+// "가장 싸게 보는 법" 판정 (클라이언트/서버 공용, 순수 함수).
 //
-// 주의: TMDB/무료 API는 per-title 실제 금액을 주지 않는다. 여기서는 한국 VOD 의
-// '표준 단가'(신작/구작 tier)를 사용한 추정치이며, 정확한 가격이 아니다.
-// 신작/구작은 출시일(release date)로 분류한다.
+// v0.4.0 부터 **추정치를 쓰지 않는다.** 이전에는 한국 VOD 표준 단가 tier(신작/구작)로
+// 금액을 추정했는데, 실측해 보니 오차가 컸다 (인셉션 대여 추정 ₩2,500 vs 실제 ₩1,320).
+// 의사결정 도구에서 틀린 숫자는 숫자가 없는 것보다 나쁘므로, 이제 JustWatch 실측가만
+// 노출하고 **실제 가격을 모르면 금액을 표시하지 않는다** (price: null).
+//
+// 가격 출처: lib/justwatch.ts (실패 시 null → 금액 없이 "대여 가능"으로만 표시)
 
-import pricesData from "@/data/prices.json";
+import { minPrice } from "@/lib/offers";
+import type { JwOffer } from "@/types/justwatch";
 import type { TmdbProvider, TmdbRegionProviders } from "@/types/tmdb";
-
-interface Tier {
-  label: string;
-  rent: number;
-  buy: number;
-}
-
-const NEW_WINDOW_MONTHS = pricesData.newWindowMonths;
-const TIERS = pricesData.tiers as { new: Tier; catalog: Tier };
-
-/** 출시일 문자열(YYYY-MM-DD)로 신작 여부 판정. 날짜 없으면 구작으로 간주. */
-export function isNewRelease(releaseDate?: string, now: Date = new Date()): boolean {
-  if (!releaseDate) return false;
-  const released = new Date(releaseDate);
-  if (Number.isNaN(released.getTime())) return false;
-  const months =
-    (now.getFullYear() - released.getFullYear()) * 12 +
-    (now.getMonth() - released.getMonth());
-  return months <= NEW_WINDOW_MONTHS;
-}
-
-export function estimatePrice(kind: "rent" | "buy", isNew: boolean): number {
-  return TIERS[isNew ? "new" : "catalog"][kind];
-}
-
-export function tierLabel(isNew: boolean): string {
-  return TIERS[isNew ? "new" : "catalog"].label;
-}
 
 export type BestValue =
   | { kind: "subscription-free"; providers: TmdbProvider[] } // 내 구독으로 무료
@@ -42,9 +18,9 @@ export type BestValue =
   | {
       kind: "rent" | "buy";
       providers: TmdbProvider[];
-      estimate: number;
-      isNew: boolean;
-    } // 대여/구매 (표준 단가 추정)
+      /** JustWatch 실측가(KRW). 모르면 null — 이때는 금액을 표시하지 않는다 */
+      price: number | null;
+    }
   | { kind: "subscription-needed"; providers: TmdbProvider[] } // 구독 필요(내 구독 아님)
   | { kind: "unavailable" }; // 시청 정보 없음
 
@@ -57,15 +33,17 @@ export function isFreeToWatch(bv: BestValue): boolean {
 
 /**
  * 내 구독을 기준으로 "가장 이득인 시청 방법"을 판정.
- * 우선순위: 내 구독(무료) → 무료 → 광고형 무료 → 대여(추정) → 구매(추정) → 구독 필요 → 없음
+ * 우선순위: 내 구독(무료) → 무료 → 광고형 무료 → 대여/구매 → 구독 필요 → 없음
  *
  * 내 구독을 free/ads 보다 앞에 두는 이유: 이미 지불한 구독으로 광고 없이 보는 게
  * 같은 0원이라도 사용자에게 낫다.
+ *
+ * @param offers JustWatch 실측 오퍼. 없으면(null) 금액 없이 경로만 판정한다.
  */
 export function bestValue(
   providers: TmdbRegionProviders | undefined,
   subscribedIds: Set<number>,
-  isNew: boolean,
+  offers?: JwOffer[] | null,
 ): BestValue {
   const flatrate = providers?.flatrate ?? [];
   const mine = flatrate.filter((p) => subscribedIds.has(p.provider_id));
@@ -79,24 +57,23 @@ export function bestValue(
   if (ads.length > 0) return { kind: "ads", providers: ads };
 
   const rent = providers?.rent ?? [];
-  if (rent.length > 0) {
-    return {
-      kind: "rent",
-      providers: rent,
-      estimate: estimatePrice("rent", isNew),
-      isNew,
-    };
-  }
-
   const buy = providers?.buy ?? [];
-  if (buy.length > 0) {
-    return {
-      kind: "buy",
-      providers: buy,
-      estimate: estimatePrice("buy", isNew),
-      isNew,
-    };
+  const rentPrice = rent.length > 0 ? minPrice(offers, "rent") : null;
+  const buyPrice = buy.length > 0 ? minPrice(offers, "buy") : null;
+
+  // 실제 금액을 아는 경우엔 대여/구매 중 정말 싼 쪽을 고른다.
+  // (구작은 구매가 대여보다 싼 경우가 실제로 있어서, 무조건 대여 우선은 틀릴 수 있다)
+  if (rentPrice !== null && buyPrice !== null) {
+    return buyPrice < rentPrice
+      ? { kind: "buy", providers: buy, price: buyPrice }
+      : { kind: "rent", providers: rent, price: rentPrice };
   }
+  if (rentPrice !== null) return { kind: "rent", providers: rent, price: rentPrice };
+  if (buyPrice !== null) return { kind: "buy", providers: buy, price: buyPrice };
+
+  // 금액을 모르는 경우: 경로만 알려주고 숫자는 붙이지 않는다.
+  if (rent.length > 0) return { kind: "rent", providers: rent, price: null };
+  if (buy.length > 0) return { kind: "buy", providers: buy, price: null };
 
   if (flatrate.length > 0)
     return { kind: "subscription-needed", providers: flatrate };
