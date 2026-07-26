@@ -54,3 +54,89 @@ export interface SearchItemWithProviders {
   item: TmdbSearchResult;
   providers?: TmdbRegionProviders;
 }
+
+// ── 상세 (append_to_response=watch/providers,credits) ────────────────────────
+
+export interface TmdbGenre {
+  id: number;
+  name: string;
+}
+
+export interface TmdbCastMember {
+  id: number;
+  name: string;
+  character?: string;
+  profile_path: string | null;
+  order?: number;
+}
+
+export interface TmdbCrewMember {
+  id: number;
+  name: string;
+  job?: string;
+}
+
+export interface TmdbCredits {
+  cast?: TmdbCastMember[];
+  crew?: TmdbCrewMember[];
+}
+
+interface TmdbDetailCommon {
+  id: number;
+  overview?: string;
+  tagline?: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  genres?: TmdbGenre[];
+  vote_average?: number;
+  vote_count?: number;
+  homepage?: string;
+  credits?: TmdbCredits;
+  // append_to_response 키에 슬래시가 들어감
+  "watch/providers"?: { results?: Record<string, TmdbRegionProviders> };
+}
+
+export interface TmdbMovieDetail extends TmdbDetailCommon {
+  title: string;
+  original_title?: string;
+  release_date?: string;
+  runtime?: number | null;
+}
+
+export interface TmdbTvDetail extends TmdbDetailCommon {
+  name: string;
+  original_name?: string;
+  first_air_date?: string;
+  last_air_date?: string;
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  status?: string;
+  created_by?: { id: number; name: string }[];
+}
+
+/**
+ * movie/tv 응답 차이를 흡수한 화면용 정규화 타입.
+ * (title/name, release_date/first_air_date, runtime/number_of_seasons …)
+ */
+export interface TitleDetail {
+  id: number;
+  mediaType: MediaType;
+  title: string;
+  originalTitle?: string;
+  overview?: string;
+  tagline?: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  releaseDate?: string;
+  year: string | null;
+  genres: string[];
+  voteAverage?: number;
+  voteCount?: number;
+  /** 영화: "148분" / 시리즈: "3시즌 · 22화" */
+  lengthLabel: string | null;
+  /** 영화는 감독, 시리즈는 제작자 */
+  directors: string[];
+  cast: TmdbCastMember[];
+  providers?: TmdbRegionProviders;
+}

@@ -3,9 +3,12 @@ import "server-only";
 import type {
   MediaType,
   SearchItemWithProviders,
+  TitleDetail,
+  TmdbMovieDetail,
   TmdbPaginated,
   TmdbProvider,
   TmdbSearchResult,
+  TmdbTvDetail,
   TmdbWatchProvidersResponse,
 } from "@/types/tmdb";
 
@@ -16,6 +19,9 @@ const ACCESS_TOKEN = process.env.TMDB_ACCESS_TOKEN?.trim();
 const API_KEY = process.env.TMDB_API_KEY?.trim();
 
 export class TmdbConfigError extends Error {}
+
+/** TMDB 가 404 를 준 경우 (없는 id 등) — 호출부에서 notFound() 로 변환 */
+export class TmdbNotFoundError extends Error {}
 
 /**
  * TMDB API 호출 (서버 전용).
@@ -54,6 +60,9 @@ async function tmdbFetch<T>(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (res.status === 404) {
+      throw new TmdbNotFoundError(`TMDB 리소스 없음: ${path}`);
+    }
     throw new Error(`TMDB 요청 실패 (${res.status}): ${body.slice(0, 200)}`);
   }
 
@@ -105,6 +114,70 @@ export async function searchWithProviders(
       }
     }),
   );
+}
+
+function minutesLabel(min: number): string {
+  return min >= 60
+    ? `${Math.floor(min / 60)}시간 ${min % 60}분`.replace(" 0분", "")
+    : `${min}분`;
+}
+
+/**
+ * 상세 정보 + 지역 제공처 + 크레딧을 **한 번의 요청**으로 조회해 정규화.
+ * append_to_response 로 묶어 movie/tv 각각 1콜만 쓴다.
+ */
+export async function getTitleDetail(
+  mediaType: MediaType,
+  id: number,
+  region = process.env.TMDB_REGION ?? "KR",
+): Promise<TitleDetail> {
+  const raw = await tmdbFetch<TmdbMovieDetail | TmdbTvDetail>(
+    `/${mediaType}/${id}`,
+    { append_to_response: "watch/providers,credits" },
+  );
+
+  const isMovie = mediaType === "movie";
+  const movie = raw as TmdbMovieDetail;
+  const tv = raw as TmdbTvDetail;
+
+  const title = isMovie ? movie.title : tv.name;
+  const releaseDate = isMovie ? movie.release_date : tv.first_air_date;
+
+  let lengthLabel: string | null = null;
+  if (isMovie) {
+    lengthLabel = movie.runtime ? minutesLabel(movie.runtime) : null;
+  } else if (tv.number_of_seasons) {
+    lengthLabel = tv.number_of_episodes
+      ? `시즌 ${tv.number_of_seasons}개 · ${tv.number_of_episodes}화`
+      : `시즌 ${tv.number_of_seasons}개`;
+  }
+
+  // 영화는 감독, 시리즈는 제작자(created_by)를 같은 자리에 표시
+  const directors = isMovie
+    ? (raw.credits?.crew ?? [])
+        .filter((c) => c.job === "Director")
+        .map((c) => c.name)
+    : (tv.created_by ?? []).map((c) => c.name);
+
+  return {
+    id: raw.id,
+    mediaType,
+    title: title ?? "제목 없음",
+    originalTitle: isMovie ? movie.original_title : tv.original_name,
+    overview: raw.overview || undefined,
+    tagline: raw.tagline || undefined,
+    posterPath: raw.poster_path,
+    backdropPath: raw.backdrop_path,
+    releaseDate,
+    year: releaseDate ? releaseDate.slice(0, 4) : null,
+    genres: (raw.genres ?? []).map((g) => g.name),
+    voteAverage: raw.vote_average,
+    voteCount: raw.vote_count,
+    lengthLabel,
+    directors: [...new Set(directors)],
+    cast: (raw.credits?.cast ?? []).slice(0, 8),
+    providers: raw["watch/providers"]?.results?.[region],
+  };
 }
 
 /**

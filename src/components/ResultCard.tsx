@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { BestValueLine } from "@/components/BestValueLine";
 import { ProviderStrip } from "@/components/ProviderStrip";
@@ -53,6 +54,7 @@ export function ResultCard({
   const y = year(item);
   const pill = statusPill(providers, subscribedIds);
   const newRelease = isNewRelease(item.release_date ?? item.first_air_date);
+  const href = `/title/${item.media_type}/${item.id}`;
 
   return (
     <li className="group flex flex-col gap-2.5">
@@ -80,6 +82,13 @@ export function ResultCard({
           </span>
         )}
 
+        {/* 포스터 전체를 덮는 링크. ♡ 버튼(z-20)보다 아래에 둬서 클릭이 겹치지 않게 함 */}
+        <Link
+          href={href}
+          aria-label={`${title(item)} 상세 보기`}
+          className="absolute inset-0 z-10"
+        />
+
         <WatchlistButton
           item={{
             id: item.id,
@@ -94,7 +103,9 @@ export function ResultCard({
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-col gap-0.5">
           <h3 className="line-clamp-1 text-sm font-semibold" title={title(item)}>
-            {title(item)}
+            <Link href={href} className="hover:underline underline-offset-2">
+              {title(item)}
+            </Link>
           </h3>
           <p className="text-xs text-gray-500">
             {[y, item.media_type === "tv" ? "시리즈" : "영화"]

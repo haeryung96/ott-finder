@@ -128,9 +128,42 @@ OTT Finder의 차별점:
     표시할 땐 `dedupeProviders()`로 합쳐 로고·이름이 두 번 뜨지 않게 함.
   - 배지·정렬·결론 문구가 서로 어긋나 있던 것도 같은 우선순위로 통일.
 
+- [x] **v0.3.0 — 상세 페이지 + 진짜 딥링크** (2026-07-26) — 동작 확인 완료
+  - v0.2.0의 "무료 API로는 per-title 딥링크 불가"는 **틀린 결론이었음.** 정확히는
+    *TMDB만으로는* 불가. TMDB watch 페이지 HTML 안에 이미 JustWatch 클릭 URL로 감싼
+    진짜 딥링크가 있었고, JustWatch GraphQL(`apis.justwatch.com/graphql`)로 정식 조회 가능.
+  - **딥링크 확보** — `netflix.com/title/81040344`, `tving.com/contents/P001782817`,
+    `wavve.com/player/movie?movieid=...`, `watcha.com/contents/mW4L2XW`
+  - **실제 대여/구매가도 나옴** — 추정치 오차가 컸다:
+    인셉션 대여 추정 ₩2,500 → 실제 **₩1,320**, 구매 추정 ₩7,700 → 실제 **₩4,950**
+    (상세 페이지에 우선 반영. 검색 카드·조합 계산은 v0.4.0에서)
+  - **매칭은 fuzzy 하지 않음** — JustWatch에 TMDB id 직접 조회 필드가 없어(`nodeByExternalId`
+    미존재) 제목으로 검색하지만, `externalIds.tmdbId` + `objectType`으로 **정확히 대조**한다.
+    ("오징어 게임" 검색 시 딸려오는 더 챌린지/이야기/벽난로가 id로 정확히 걸러짐)
+  - **packageId == TMDB provider_id** — TMDB가 JustWatch에서 provider 데이터를 받아오기
+    때문. 7개 서비스 전부 일치 확인 → 별도 매핑 테이블 없이 `lib/providers.ts`에 그대로 붙음
+  - **폴백 설계** — `lib/justwatch.ts`는 **어떤 실패에서도 예외를 던지지 않고 null 반환**
+    (5초 타임아웃, 스키마 변경, 차단, 매칭 실패 모두). 엔드포인트를 죽여서 실제로 검증함.
+  - **상세 페이지 `/title/[mediaType]/[id]`** — `append_to_response=watch/providers,credits`로
+    **1회 호출**. 결론 배너 + 제공처 breakdown + 줄거리 + 감독·출연. `generateMetadata` 지원.
+
+  ⚠️ **비공식 API 의존** — `apis.justwatch.com/graphql`은 문서화돼 있지 않고
+  introspection도 막혀 있다(`introspection disabled`). 레이트 리밋도 공개된 값이 없다.
+  개인 학습·포트폴리오 용도라는 전제에서의 선택이며, 상업적 이용은 약관 위반이다.
+  (공식 대안 Watchmode는 무료 티어 월 2,500콜/3개국 — 현재 구조엔 쿼터가 부족)
+
+### v0.3.0에서 확인 후 **의도적으로 뺀 것**
+- **시즌별 제공처** — `/tv/{id}/season/{n}/watch/providers`는 200을 주지만 KR 응답이
+  시리즈 레벨과 **동일**(link까지 같음)해서 정보량이 0. 호출만 늘어나 제외.
+- **Disney+ / Coupang Play 검색 링크** — Disney+는 `/search`가 404, Coupang Play는
+  SPA catch-all이라 파라미터 이름을 확정할 수 없었음. 추측 대신 TMDB link 폴백.
+
 **다음 할 일:**
-- [ ] (개선) 검색 디바운스/자동완성, 상세 페이지(구독/대여/구매 breakdown + 가격표)
-- [ ] prices.json 실제 가격 검증/갱신, 신작·구작 단가 구분
+- [ ] **검색 카드와 상세 페이지의 가격이 불일치** — 카드는 아직 추정치, 상세는 실제가
+- [ ] **조합 계산(`/api/bundle`)도 아직 추정치** — 위시리스트는 소수라 실제가를 쓰기 좋음
+- [ ] JustWatch 레이트 리밋 파악 + 실패율 로깅 (지금은 조용히 폴백만 함)
+- [ ] (개선) 검색 디바운스/자동완성
+- [ ] prices.json 실제 가격 검증/갱신
 - [ ] (확장) "이번 달 얼마 아꼈나" 대시보드
 
 ### UI 디자인 방향 (적용됨)
@@ -153,10 +186,15 @@ src/
     api/providers/route.ts   # KR 제공처 목록 (ID 검증용)
     layout.tsx  page.tsx
   lib/
-    tmdb.ts                  # 서버 전용 TMDB 클라이언트
-    providers.ts             # 국내 OTT 상수 (일부 ID 검증 필요)
-  types/tmdb.ts
+    tmdb.ts                  # 서버 전용 TMDB 클라이언트 (검색·상세·제공처)
+    justwatch.ts             # 서버 전용 · 딥링크+실제가 (v0.3.0, 실패 시 null)
+    offers.ts                # JustWatch 오퍼 순수 헬퍼 (클라이언트 공용)
+    providers.ts             # 국내 OTT 상수 + alias 매핑 + dedupeProviders()
+    watchLink.ts             # 검색 URL 폴백 링크
+  app/title/[mediaType]/[id]/page.tsx   # 작품 상세 (v0.3.0)
+  types/tmdb.ts  types/justwatch.ts
   data/prices.json           # 대여/구매 가격 seed (수동 관리)
+  data/watch-links.json      # 서비스 검색 URL 템플릿
 ```
 
 ---

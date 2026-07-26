@@ -1,0 +1,39 @@
+{
+  "_comment": "제공처별 '보러 가기' 링크 템플릿. {q} 자리에 encodeURIComponent(제목)이 들어갑니다. 무료 API로는 per-title 딥링크를 얻을 수 없으므로(JustWatch 파트너 API 영역), 해당 서비스의 검색 결과 페이지로 보냅니다.",
+  "_verification": "2026-07-26 확인. '없는 경로'를 대조군으로 함께 호출해 SPA catch-all(무엇이든 200) 여부를 구분했습니다. verified=true 는 대조군이 404/400 인데 검색 URL 만 200 이라 경로가 실제로 존재함이 확인된 경우입니다.",
+  "_fallback": "여기 없는 서비스(예: Disney+, Coupang Play)는 TMDB watch/providers 의 link(themoviedb.org 경유 페이지)로 폴백합니다. Disney+ 는 /search 가 404, Coupang Play 는 catch-all 이라 파라미터 이름을 확정할 수 없어 의도적으로 제외했습니다.",
+  "templates": {
+    "tving": {
+      "url": "https://www.tving.com/search?keyword={q}",
+      "verified": true
+    },
+    "prime-video": {
+      "url": "https://www.primevideo.com/search?phrase={q}",
+      "verified": true
+    },
+    "google-play": {
+      "url": "https://play.google.com/store/search?q={q}&c=movies",
+      "verified": true
+    },
+    "netflix": {
+      "url": "https://www.netflix.com/search?q={q}",
+      "verified": false,
+      "note": "SPA catch-all 이라 대조군으로 확인 불가. 널리 쓰이는 표준 검색 경로."
+    },
+    "wavve": {
+      "url": "https://www.wavve.com/search?searchWord={q}",
+      "verified": false,
+      "note": "SPA catch-all 이라 대조군으로 확인 불가."
+    },
+    "watcha": {
+      "url": "https://watcha.com/search?query={q}",
+      "verified": false,
+      "note": "SPA catch-all 이라 대조군으로 확인 불가."
+    },
+    "apple-tv": {
+      "url": "https://tv.apple.com/search?term={q}",
+      "verified": false,
+      "note": "SPA catch-all 이라 대조군으로 확인 불가."
+    }
+  }
+}
