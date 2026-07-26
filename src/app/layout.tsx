@@ -40,12 +40,20 @@ export default function RootLayout({
               </span>
               OTT Finder
             </Link>
-            <Link
-              href="/settings"
-              className="rounded-full px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-            >
-              설정
-            </Link>
+            <div className="flex items-center gap-1">
+              <Link
+                href="/watchlist"
+                className="rounded-full px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              >
+                내 조합
+              </Link>
+              <Link
+                href="/settings"
+                className="rounded-full px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              >
+                설정
+              </Link>
+            </div>
           </nav>
         </header>
         {children}

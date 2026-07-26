@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import { BestValueLine } from "@/components/BestValueLine";
 import { ProviderStrip } from "@/components/ProviderStrip";
+import { WatchlistButton } from "@/components/WatchlistButton";
 import { tmdbImage } from "@/lib/image";
 import { isNewRelease } from "@/lib/pricing";
 import type { SearchItemWithProviders } from "@/types/tmdb";
@@ -75,6 +76,16 @@ export function ResultCard({
             {pill.label}
           </span>
         )}
+
+        <WatchlistButton
+          item={{
+            id: item.id,
+            mediaType: item.media_type as "movie" | "tv",
+            title: title(item),
+            poster: item.poster_path,
+            releaseDate: item.release_date ?? item.first_air_date,
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
