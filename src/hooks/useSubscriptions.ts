@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { providerBySlug } from "@/lib/providers";
+import { tmdbIdsForSlug } from "@/lib/providers";
 
 const STORAGE_KEY = "ott-finder:subscriptions";
 const ONBOARDED_KEY = "ott-finder:onboarded";
@@ -102,11 +102,8 @@ export function useSubscriptions() {
     write(next, true);
   }, []);
 
-  const tmdbIds = new Set(
-    slugs
-      .map((s) => providerBySlug(s)?.tmdbId)
-      .filter((id): id is number => id !== undefined),
-  );
+  // alias(광고형 요금제 등)까지 포함해야 "바로 보기" 판정이 어긋나지 않음
+  const tmdbIds = new Set(slugs.flatMap(tmdbIdsForSlug));
 
   return {
     slugs,

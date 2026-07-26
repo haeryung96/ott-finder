@@ -30,8 +30,13 @@ function rentLabel(r: RentPlan): string {
 
 /** /api/bundle 결과를 "결정" 카드로 렌더 (순수 표시 컴포넌트) */
 export function BundleResultView({ result }: { result: BundleResult }) {
-  const { recommended, coveredBySubscription, rentSeparately, unavailable } =
-    result;
+  const {
+    recommended,
+    coveredBySubscription,
+    rentSeparately,
+    watchFree,
+    unavailable,
+  } = result;
   const hasSubs = recommended.services.length > 0;
 
   return (
@@ -57,6 +62,7 @@ export function BundleResultView({ result }: { result: BundleResult }) {
 
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
           구독으로 {recommended.coveredCount}편 커버
+          {watchFree.length > 0 && ` · ${watchFree.length}편은 0원`}
           {rentSeparately.length > 0 &&
             ` · ${rentSeparately.length}편은 대여/구매 (약 ${formatKRW(recommended.rentalCost)})`}
         </p>
@@ -119,6 +125,25 @@ export function BundleResultView({ result }: { result: BundleResult }) {
                     {via
                       .map((slug) => recommended.services.find((s) => s.slug === slug)?.name ?? slug)
                       .join(", ")}
+                  </span>
+                }
+              />
+            ))}
+          </Section>
+        )}
+
+        {watchFree.length > 0 && (
+          <Section title={`구독 없이 0원 (${watchFree.length})`}>
+            {watchFree.map((t) => (
+              <Row
+                key={`${t.mediaType}-${t.id}`}
+                poster={t.poster}
+                title={t.title}
+                right={
+                  <span className="text-sky-600 dark:text-sky-400">
+                    {t.freeKind === "ads" ? "광고 보고 무료" : "무료"}
+                    {t.freeProviderNames.length > 0 &&
+                      ` · ${t.freeProviderNames.slice(0, 2).join(", ")}`}
                   </span>
                 }
               />

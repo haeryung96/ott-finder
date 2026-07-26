@@ -13,15 +13,21 @@ export interface ProviderDef {
   name: string;
   /** TMDB provider_id (검증 필요 항목은 verified:false) */
   tmdbId: number;
+  /**
+   * 같은 서비스인데 TMDB 가 별도 provider_id 로 내보내는 요금제 변형.
+   * 예: "Netflix Standard with Ads"(1796) 는 넷플릭스 구독자면 볼 수 있으므로
+   * 8 과 같은 서비스로 취급해야 "바로 보기" 판정이 어긋나지 않는다.
+   */
+  aliasIds?: number[];
   /** 구독 필터 UI에 노출할 대표 구독형 서비스인지 */
   subscription: boolean;
   /** tmdbId 를 라이브 응답으로 확인했는지 */
   verified: boolean;
 }
 
-// 모두 KR 라이브 응답으로 검증됨 (2026-07-23)
+// 모두 KR 라이브 응답으로 검증됨 (2026-07-23, alias 는 2026-07-26)
 export const PROVIDERS: ProviderDef[] = [
-  { slug: "netflix", name: "Netflix", tmdbId: 8, subscription: true, verified: true },
+  { slug: "netflix", name: "Netflix", tmdbId: 8, aliasIds: [1796], subscription: true, verified: true },
   { slug: "disney-plus", name: "Disney+", tmdbId: 337, subscription: true, verified: true },
   { slug: "prime-video", name: "Amazon Prime Video", tmdbId: 119, subscription: true, verified: true },
   { slug: "watcha", name: "Watcha", tmdbId: 97, subscription: true, verified: true },
@@ -32,7 +38,13 @@ export const PROVIDERS: ProviderDef[] = [
   { slug: "google-play", name: "Google Play Movies", tmdbId: 3, subscription: false, verified: true },
 ];
 
-const BY_ID = new Map(PROVIDERS.map((p) => [p.tmdbId, p]));
+// 대표 id 와 alias id 를 모두 같은 정의로 해석
+const BY_ID = new Map<number, ProviderDef>();
+for (const p of PROVIDERS) {
+  BY_ID.set(p.tmdbId, p);
+  for (const alias of p.aliasIds ?? []) BY_ID.set(alias, p);
+}
+
 const BY_SLUG = new Map(PROVIDERS.map((p) => [p.slug, p]));
 
 export function providerById(tmdbId: number): ProviderDef | undefined {
@@ -41,6 +53,30 @@ export function providerById(tmdbId: number): ProviderDef | undefined {
 
 export function providerBySlug(slug: string): ProviderDef | undefined {
   return BY_SLUG.get(slug);
+}
+
+/** 슬러그 하나가 커버하는 모든 TMDB provider_id (대표 + alias) */
+export function tmdbIdsForSlug(slug: string): number[] {
+  const p = BY_SLUG.get(slug);
+  if (!p) return [];
+  return [p.tmdbId, ...(p.aliasIds ?? [])];
+}
+
+/**
+ * 같은 서비스의 요금제 변형을 하나로 합친다.
+ * 예: [Netflix(8), Netflix Standard with Ads(1796)] → [Netflix(8)]
+ * 카탈로그에 없는 provider 는 id 기준으로만 중복 제거한다.
+ */
+export function dedupeProviders<T extends { provider_id: number }>(
+  list: T[],
+): T[] {
+  const seen = new Set<string>();
+  return list.filter((p) => {
+    const key = BY_ID.get(p.provider_id)?.slug ?? `id:${p.provider_id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** 구독 필터 온보딩에 노출할 대표 구독형 OTT */

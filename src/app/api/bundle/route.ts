@@ -61,6 +61,8 @@ export async function POST(request: Request) {
         let flatrateSlugs: string[] = [];
         let canRent = false;
         let canBuy = false;
+        let freeKind: "free" | "ads" | null = null;
+        let freeProviderNames: string[] = [];
 
         try {
           const wp = await getWatchProviders(it.mediaType, it.id);
@@ -75,6 +77,17 @@ export async function POST(request: Request) {
           ];
           canRent = (rp?.rent?.length ?? 0) > 0;
           canBuy = (rp?.buy?.length ?? 0) > 0;
+
+          // 0원 경로. 광고 없는 free 를 ads 보다 우선.
+          const freeList = rp?.free ?? [];
+          const adsList = rp?.ads ?? [];
+          if (freeList.length > 0) {
+            freeKind = "free";
+            freeProviderNames = freeList.map((p) => p.provider_name);
+          } else if (adsList.length > 0) {
+            freeKind = "ads";
+            freeProviderNames = adsList.map((p) => p.provider_name);
+          }
         } catch {
           // 개별 제공처 조회 실패 시 해당 작품은 '시청 정보 없음'으로 취급
         }
@@ -88,6 +101,8 @@ export async function POST(request: Request) {
           flatrateSlugs,
           canRent,
           canBuy,
+          freeKind,
+          freeProviderNames,
         };
       }),
     );

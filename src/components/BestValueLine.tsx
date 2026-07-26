@@ -1,9 +1,12 @@
 import { bestValue, formatKRW, tierLabel } from "@/lib/pricing";
-import type { TmdbRegionProviders } from "@/types/tmdb";
+import { dedupeProviders } from "@/lib/providers";
+import type { TmdbProvider, TmdbRegionProviders } from "@/types/tmdb";
 
-function names(list: { provider_name: string }[], max = 2): string {
-  const shown = list.slice(0, max).map((p) => p.provider_name);
-  const extra = list.length - shown.length;
+/** 요금제 변형을 합친 뒤 최대 max 개까지 표기 */
+function names(list: TmdbProvider[], max = 2): string {
+  const unique = dedupeProviders(list);
+  const shown = unique.slice(0, max).map((p) => p.provider_name);
+  const extra = unique.length - shown.length;
   return extra > 0 ? `${shown.join(", ")} 외 ${extra}` : shown.join(", ");
 }
 
@@ -25,6 +28,22 @@ export function BestValueLine({
     return (
       <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
         내 구독으로 무료 · {names(bv.providers)}
+      </p>
+    );
+  }
+
+  if (bv.kind === "free") {
+    return (
+      <p className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+        무료 시청 · {names(bv.providers)}
+      </p>
+    );
+  }
+
+  if (bv.kind === "ads") {
+    return (
+      <p className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+        광고 보고 무료 · {names(bv.providers)}
       </p>
     );
   }

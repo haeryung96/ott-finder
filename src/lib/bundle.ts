@@ -5,6 +5,8 @@
 //
 // 목적 함수(= "이번 달" 총비용):
 //   Σ(선택한 구독 월정액)  +  Σ(구독으로 커버 안 되는 작품의 대여/구매 추정치)
+// 무료(free)·광고형(ads)으로 볼 수 있는 작품은 어떤 조합에서도 0원이라 최적화 대상에서
+// 미리 제외한다 (optimizeBundle 의 watchFree).
 // recurring(구독)과 one-time(대여)을 "이번 달에 한 번 다 본다"는 가정으로 비교한다.
 // 대여/구매가는 pricing.ts 표준 단가 추정치라 정확값이 아니지만, 구독 월정액은
 // 공개·안정적이므로 조합 판단의 근거는 대체로 견고하다.
@@ -35,6 +37,10 @@ export interface BundleTitle {
   flatrateSlugs: string[];
   canRent: boolean;
   canBuy: boolean;
+  /** 구독 없이 0원으로 볼 수 있는 경로 (free=무료, ads=광고형). 없으면 null */
+  freeKind: "free" | "ads" | null;
+  /** freeKind 가 있을 때 그 무료 제공처 이름들 (표시용) */
+  freeProviderNames: string[];
 }
 
 export interface BundleService {
@@ -64,9 +70,14 @@ interface SubsetEval {
   rent: RentPlan[];
 }
 
-/** 국내 어떤 경로로도 볼 수 없는 작품(구독·대여·구매 모두 없음) */
+/** 국내 어떤 경로로도 볼 수 없는 작품(무료·구독·대여·구매 모두 없음) */
 function isTrulyUnavailable(t: BundleTitle): boolean {
-  return t.flatrateSlugs.length === 0 && !t.canRent && !t.canBuy;
+  return (
+    t.freeKind === null &&
+    t.flatrateSlugs.length === 0 &&
+    !t.canRent &&
+    !t.canBuy
+  );
 }
 
 /**
@@ -123,6 +134,8 @@ export interface BundleResult {
   };
   coveredBySubscription: CoveredPlan[];
   rentSeparately: RentPlan[];
+  /** 구독 없이 0원으로 볼 수 있어 조합 계산에서 제외된 작품 */
+  watchFree: BundleTitle[];
   unavailable: BundleTitle[];
   /** 지금 구독 중이지만 이 위시리스트엔 최적 조합에 없는 서비스 (해지 후보) */
   drop: BundleService[];
@@ -154,9 +167,18 @@ export function optimizeBundle(
 ): BundleResult | null {
   if (titles.length === 0) return null;
 
-  // 국내 어떤 경로로도 볼 수 없는 작품은 최적화 대상에서 분리 (조합과 무관)
+  // 최적화 대상에서 분리되는 두 부류 (둘 다 어떤 조합을 골라도 비용이 안 변함):
+  //  1) 어떤 경로로도 볼 수 없는 작품
+  //  2) 구독 없이 0원으로 볼 수 있는 작품 — 이걸 분리하지 않으면 무료 작품을 커버하려고
+  //     불필요한 구독을 추천하거나, 대여도 안 되는 무료 작품에서 feasible=false 가 되어
+  //     멀쩡한 조합이 통째로 탈락한다.
   const unavailable = titles.filter(isTrulyUnavailable);
-  const watchable = titles.filter((t) => !isTrulyUnavailable(t));
+  const watchFree = titles.filter(
+    (t) => !isTrulyUnavailable(t) && t.freeKind !== null,
+  );
+  const watchable = titles.filter(
+    (t) => !isTrulyUnavailable(t) && t.freeKind === null,
+  );
 
   // 후보 서비스 = 카탈로그에 있고, 볼 수 있는 작품 중 하나라도 구독형으로 제공하는 서비스.
   // (아무 작품도 커버 못 하는 서비스는 조합에 넣어봐야 비용만 늘어 최적해에 절대 안 들어감)
@@ -205,6 +227,7 @@ export function optimizeBundle(
     },
     coveredBySubscription: ev.covered,
     rentSeparately: ev.rent,
+    watchFree,
     unavailable,
     drop: subscribedInCatalog
       .filter((s) => !chosenSet.has(s))

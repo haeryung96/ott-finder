@@ -29,13 +29,16 @@ function statusPill(
       label: "바로 보기",
       className: "bg-emerald-500 text-white",
     };
+  // 무료 경로를 구독보다 먼저 (bestValue 우선순위와 동일하게 유지)
+  if ((providers?.free?.length ?? 0) > 0)
+    return { label: "무료", className: "bg-sky-500 text-white" };
+  if ((providers?.ads?.length ?? 0) > 0)
+    return { label: "광고형 무료", className: "bg-sky-500 text-white" };
   if (flatrate.length > 0)
     return {
       label: "구독",
       className: "bg-gray-900/85 text-white dark:bg-white/90 dark:text-gray-900",
     };
-  if ((providers?.free?.length ?? 0) > 0)
-    return { label: "무료", className: "bg-sky-500 text-white" };
   if ((providers?.rent?.length ?? 0) > 0 || (providers?.buy?.length ?? 0) > 0)
     return { label: "대여·구매", className: "bg-amber-500 text-white" };
   return null;

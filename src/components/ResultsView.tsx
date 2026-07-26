@@ -16,17 +16,21 @@ function watchableByMe(
   );
 }
 
-/** 정렬 순위: 내 구독 → 구독형 → 무료 → 대여/구매 → 정보없음 */
+/**
+ * 정렬 순위: 내 구독 → 무료 → 광고형 무료 → 구독형 → 대여/구매 → 정보없음.
+ * pricing.ts `bestValue()` 의 우선순위와 같은 순서를 유지한다.
+ */
 function rank(
   item: SearchItemWithProviders,
   subscribedIds: Set<number>,
 ): number {
   const pv = item.providers;
   if (watchableByMe(item, subscribedIds)) return 0;
-  if ((pv?.flatrate?.length ?? 0) > 0) return 1;
-  if ((pv?.free?.length ?? 0) > 0) return 2;
-  if ((pv?.rent?.length ?? 0) > 0 || (pv?.buy?.length ?? 0) > 0) return 3;
-  return 4;
+  if ((pv?.free?.length ?? 0) > 0) return 1;
+  if ((pv?.ads?.length ?? 0) > 0) return 2;
+  if ((pv?.flatrate?.length ?? 0) > 0) return 3;
+  if ((pv?.rent?.length ?? 0) > 0 || (pv?.buy?.length ?? 0) > 0) return 4;
+  return 5;
 }
 
 export function ResultsView({
