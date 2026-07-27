@@ -3,10 +3,15 @@ import {
   type BundleResult,
   type BundleTitle,
 } from "@/lib/bundle";
+import { mergeAvailability } from "@/lib/availability";
 import { getJustWatchOffers } from "@/lib/justwatch";
 import { minPrice } from "@/lib/offers";
 import { providerById } from "@/lib/providers";
-import { getWatchProviders, TmdbConfigError } from "@/lib/tmdb";
+import {
+  getProviderCatalog,
+  getWatchProviders,
+  TmdbConfigError,
+} from "@/lib/tmdb";
 import type { MediaType } from "@/types/tmdb";
 
 interface WatchlistItemInput {
@@ -57,48 +62,47 @@ export async function POST(request: Request) {
   const region = process.env.TMDB_REGION ?? "KR";
 
   try {
+    // JustWatch 로만 확인된 제공처의 로고/이름을 채우는 데 쓴다
+    const catalog = await getProviderCatalog(region);
+
     const titles: BundleTitle[] = await Promise.all(
       items.map(async (it) => {
-        let flatrateSlugs: string[] = [];
-        let canRent = false;
-        let canBuy = false;
+        // 대여/구매가와 딥링크 + TMDB 가 놓친 제공처 보완용 (실패하면 null)
+        const [offers, tmdbProviders] = await Promise.all([
+          getJustWatchOffers(it.id, it.mediaType, it.title, region).catch(
+            () => null,
+          ),
+          getWatchProviders(it.mediaType, it.id)
+            .then((wp) => wp.results?.[region])
+            .catch(() => undefined),
+        ]);
+
+        // TMDB 의 KR 제공처에는 구멍이 있다. 예: 동궁(2026)은 TMDB KR 이 비어 있어
+        // "시청 정보 없음"으로 빠졌지만 JustWatch 는 Netflix 로 제공한다고 답한다.
+        const rp = mergeAvailability(tmdbProviders, offers, catalog);
+
+        const flatrateSlugs = [
+          ...new Set(
+            (rp?.flatrate ?? [])
+              .map((p) => providerById(p.provider_id))
+              .filter((d) => d?.subscription)
+              .map((d) => d!.slug),
+          ),
+        ];
+        const canRent = (rp?.rent?.length ?? 0) > 0;
+        const canBuy = (rp?.buy?.length ?? 0) > 0;
+
+        // 0원 경로. 광고 없는 free 를 ads 보다 우선.
         let freeKind: "free" | "ads" | null = null;
         let freeProviderNames: string[] = [];
-
-        // 실제 대여/구매가는 JustWatch 에서 (실패하면 null → 총액에서 제외)
-        const offers = await getJustWatchOffers(
-          it.id,
-          it.mediaType,
-          it.title,
-          region,
-        ).catch(() => null);
-
-        try {
-          const wp = await getWatchProviders(it.mediaType, it.id);
-          const rp = wp.results?.[region];
-          flatrateSlugs = [
-            ...new Set(
-              (rp?.flatrate ?? [])
-                .map((p) => providerById(p.provider_id))
-                .filter((d) => d?.subscription)
-                .map((d) => d!.slug),
-            ),
-          ];
-          canRent = (rp?.rent?.length ?? 0) > 0;
-          canBuy = (rp?.buy?.length ?? 0) > 0;
-
-          // 0원 경로. 광고 없는 free 를 ads 보다 우선.
-          const freeList = rp?.free ?? [];
-          const adsList = rp?.ads ?? [];
-          if (freeList.length > 0) {
-            freeKind = "free";
-            freeProviderNames = freeList.map((p) => p.provider_name);
-          } else if (adsList.length > 0) {
-            freeKind = "ads";
-            freeProviderNames = adsList.map((p) => p.provider_name);
-          }
-        } catch {
-          // 개별 제공처 조회 실패 시 해당 작품은 '시청 정보 없음'으로 취급
+        const freeList = rp?.free ?? [];
+        const adsList = rp?.ads ?? [];
+        if (freeList.length > 0) {
+          freeKind = "free";
+          freeProviderNames = freeList.map((p) => p.provider_name);
+        } else if (adsList.length > 0) {
+          freeKind = "ads";
+          freeProviderNames = adsList.map((p) => p.provider_name);
         }
 
         return {

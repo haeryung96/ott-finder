@@ -1,5 +1,11 @@
 import "server-only";
 
+import { cache } from "react";
+
+import {
+  mergeAvailability,
+  type ProviderCatalog,
+} from "@/lib/availability";
 import { getJustWatchOffers } from "@/lib/justwatch";
 import type {
   MediaType,
@@ -110,12 +116,14 @@ export async function searchWithProviders(
 ): Promise<SearchItemWithProviders[]> {
   const results = await searchMulti(query);
   const top = results.slice(0, limit);
+  const catalog = await getProviderCatalog(region);
+
   return Promise.all(
     top.map(async (item) => {
       const mediaType = item.media_type as MediaType;
       const title = item.title ?? item.name ?? "";
 
-      const [providers, offers] = await Promise.all([
+      const [tmdbProviders, offers] = await Promise.all([
         getWatchProviders(mediaType, item.id)
           .then((wp) => wp.results?.[region])
           .catch(() => undefined),
@@ -124,6 +132,8 @@ export async function searchWithProviders(
           : Promise.resolve(null),
       ]);
 
+      // TMDB 의 KR 제공처에는 구멍이 있어서 JustWatch 로 보완한다 (lib/availability.ts)
+      const providers = mergeAvailability(tmdbProviders, offers, catalog);
       return { item, providers, offers };
     }),
   );
@@ -207,3 +217,34 @@ export async function getRegionProviderList(
   );
   return data.results;
 }
+
+/**
+ * provider_id → 이름/로고 카탈로그 (movie + tv 합집합).
+ *
+ * JustWatch 오퍼에는 로고가 없어서, JustWatch 로만 확인된 제공처를 화면에 그리려면
+ * 로고를 여기서 채워야 한다 (mergeAvailability 의 catalog 인자).
+ * 목록은 거의 바뀌지 않으므로 요청 단위로 캐시한다.
+ */
+export const getProviderCatalog = cache(
+  async (
+    region = process.env.TMDB_REGION ?? "KR",
+  ): Promise<ProviderCatalog> => {
+    const catalog: ProviderCatalog = new Map();
+    const lists = await Promise.all(
+      (["movie", "tv"] as MediaType[]).map((mt) =>
+        getRegionProviderList(mt, region).catch(() => [] as TmdbProvider[]),
+      ),
+    );
+    for (const list of lists) {
+      for (const p of list) {
+        if (!catalog.has(p.provider_id)) {
+          catalog.set(p.provider_id, {
+            provider_name: p.provider_name,
+            logo_path: p.logo_path,
+          });
+        }
+      }
+    }
+    return catalog;
+  },
+);

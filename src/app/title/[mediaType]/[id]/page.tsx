@@ -5,9 +5,15 @@ import { notFound } from "next/navigation";
 
 import { TitleDecision } from "@/components/TitleDecision";
 import { WatchlistButton } from "@/components/WatchlistButton";
+import { mergeAvailability } from "@/lib/availability";
 import { tmdbImage } from "@/lib/image";
 import { getJustWatchOffers } from "@/lib/justwatch";
-import { getTitleDetail, TmdbConfigError, TmdbNotFoundError } from "@/lib/tmdb";
+import {
+  getProviderCatalog,
+  getTitleDetail,
+  TmdbConfigError,
+  TmdbNotFoundError,
+} from "@/lib/tmdb";
 import type { MediaType, TitleDetail } from "@/types/tmdb";
 
 interface Params {
@@ -99,6 +105,15 @@ export default async function TitlePage({ params }: Params) {
   }
 
   const detail = result.detail;
+
+  // TMDB 의 KR 제공처에는 구멍이 있다(동궁 2026: TMDB 는 KR 비어 있고 JustWatch 는 Netflix).
+  // JustWatch 오퍼를 합쳐서 "볼 수 있는 곳"을 확정한다.
+  const [offers, catalog] = await Promise.all([
+    getJustWatchOffers(detail.id, detail.mediaType, detail.title),
+    getProviderCatalog(),
+  ]);
+  const availability = mergeAvailability(detail.providers, offers, catalog);
+
   const poster = tmdbImage(detail.posterPath, "w342");
   const backdrop = tmdbImage(detail.backdropPath, "w500");
 
@@ -199,12 +214,8 @@ export default async function TitlePage({ params }: Params) {
             jwOffers 가 null 이면 금액 없이 시청 경로 + 검색 URL 로 폴백된다. */}
         <TitleDecision
           title={detail.title}
-          providers={detail.providers}
-          jwOffers={await getJustWatchOffers(
-            detail.id,
-            detail.mediaType,
-            detail.title,
-          )}
+          providers={availability}
+          jwOffers={offers}
         />
 
         {detail.overview && (
