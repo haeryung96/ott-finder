@@ -163,6 +163,15 @@ export interface BundleResult {
      * 0 보다 크면 totalThisMonth 는 **하한선**이지 확정 금액이 아니다.
      */
     unknownPriceCount: number;
+    /**
+     * 지금 내는 돈에 **더해서** 나갈 금액.
+     * = 아직 구독 안 한 추천 서비스의 월정액 + 대여/구매 비용.
+     *
+     * totalThisMonth 는 조합 자체의 비용이라, 이미 구독 중인 서비스만으로 다 볼 수 있어도
+     * 그 구독료가 그대로 찍힌다. 사용자가 실제로 궁금한 "이거 보려고 돈을 더 내야 하나?"에는
+     * 이 값이 답한다 (이미 구독 중인 것만 쓰면 0).
+     */
+    additionalCost: number;
   };
   coveredBySubscription: CoveredPlan[];
   rentSeparately: RentPlan[];
@@ -249,6 +258,14 @@ export function optimizeBundle(
   const currentEv = evalSubset(watchable, subscribedSet);
   const currentTotal = currentEv.monthlyCost + currentEv.rentalCost;
 
+  const addServices = chosen
+    .filter((s) => !subscribedSet.has(s))
+    .map(toService);
+
+  // 이미 구독 중인 서비스의 월정액은 이 위시리스트와 무관하게 나가는 돈이므로 제외한다.
+  const additionalCost =
+    addServices.reduce((sum, s) => sum + s.monthly, 0) + ev.rentalCost;
+
   return {
     recommended: {
       services: chosen.map(toService),
@@ -257,6 +274,7 @@ export function optimizeBundle(
       totalThisMonth: ev.total,
       coveredCount: ev.covered.length,
       unknownPriceCount: ev.unknownPriceCount,
+      additionalCost,
     },
     coveredBySubscription: ev.covered,
     rentSeparately: ev.rent,
@@ -265,7 +283,7 @@ export function optimizeBundle(
     drop: subscribedInCatalog
       .filter((s) => !chosenSet.has(s))
       .map(toService),
-    add: chosen.filter((s) => !subscribedSet.has(s)).map(toService),
+    add: addServices,
     current: {
       services: subscribedInCatalog.map(toService),
       totalThisMonth: currentTotal,

@@ -173,6 +173,22 @@ OTT Finder의 차별점:
   - 폴백 재검증(엔드포인트를 죽여서): 카드 "대여 가능", 상세 "추정치 대신 금액을 표시하지
     않습니다", 조합 `price: null` + `unknownPriceCount: 1` — **추정치가 새어나오는 곳 없음.**
 
+- [x] **v0.4.1 — TMDB 제공처 구멍 보완 + '추가 지출' 표시** (2026-07-27) — 동작 확인 완료
+  - **TMDB 의 KR 제공처 데이터에 구멍이 있다** (사용자 제보로 발견).
+    동궁(2026, tv/279323)은 TMDB 에 US/JP/GB 등 80개국 Netflix 정보가 있는데 **KR 만 통째로
+    비어 있었다.** 그래서 넷플릭스로 볼 수 있는 작품이 "시청 정보 없음"으로 분류되고
+    조합 계산에서도 빠졌다. 같은 작품을 JustWatch 는 KR Netflix 로 정확히 답한다.
+  - 원인은 **데이터를 손에 쥐고도 안 쓴 것** — v0.3.0 부터 JustWatch 를 붙였지만
+    가격·딥링크에만 쓰고 "어디서 볼 수 있나"는 TMDB 만 믿고 있었다.
+  - `lib/availability.ts` `mergeAvailability()` 로 TMDB + JustWatch 제공처를 **합집합**으로
+    합친다. packageId == provider_id 라 id 기준으로 그냥 합쳐진다. JustWatch 로만 확인된
+    제공처의 로고·이름은 `getProviderCatalog()`(TMDB 지역 제공처 목록)로 채운다.
+    검색·상세·조합 계산 세 경로 모두 적용.
+  - **"추가 지출" 추가** — 총액이 ₩13,500 으로 뜨는데 이미 넷플릭스를 구독 중이면
+    실제로 더 나가는 돈은 0원이다. `totalThisMonth`(조합 자체의 비용)와 별개로
+    `additionalCost`(= 아직 구독 안 한 서비스 월정액 + 대여/구매)를 계산해 메인 숫자로 올렸다.
+    조합 월비용은 작은 글씨로 남긴다 — 없애면 "현재 대비 얼마 절약" 비교의 근거가 사라진다.
+
 **다음 할 일:**
 - [ ] **JustWatch 실패를 감지할 방법이 없음** — 지금은 조용히 금액만 사라진다.
       실패율 로깅/알림이 없으면 스키마가 바뀌어도 한동안 모른다. 우선순위 높음
@@ -217,6 +233,7 @@ src/
   lib/
     tmdb.ts                  # 서버 전용 TMDB 클라이언트 (검색·상세·제공처)
     justwatch.ts             # 서버 전용 · 딥링크+실제가 (v0.3.0, 실패 시 null)
+    availability.ts          # TMDB+JustWatch 제공처 합집합 (v0.4.1)
     offers.ts                # JustWatch 오퍼 순수 헬퍼 (클라이언트 공용)
     providers.ts             # 국내 OTT 상수 + alias 매핑 + dedupeProviders()
     pricing.ts               # bestValue() — "가장 싸게 보는 법" 판정 (실측가만)
@@ -233,7 +250,8 @@ src/
 ### 데이터 출처 (v0.4.0 기준)
 | 데이터 | 출처 | 성격 |
 |---|---|---|
-| 작품 메타·검색·제공처 | TMDB | 실측 |
+| 작품 메타·검색 | TMDB | 실측 |
+| 제공처(어디서 보나) | TMDB + JustWatch **합집합** | 실측 (TMDB KR 은 누락이 있음) |
 | 대여/구매 **가격** | JustWatch | **실측** (모르면 표시 안 함) |
 | per-title **딥링크** | JustWatch | **실측** (없으면 서비스 검색 URL) |
 | 구독 월정액 | `subscriptions.json` | 수동 관리 seed |

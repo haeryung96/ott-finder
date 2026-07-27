@@ -69,16 +69,37 @@ export function BundleResultView({ result }: { result: BundleResult }) {
             ` · ${rentSeparately.length}편은 대여/구매 (약 ${formatKRW(recommended.rentalCost)})`}
         </p>
 
-        <div className="mt-3 flex items-baseline gap-2 border-t border-emerald-200/70 pt-3 dark:border-emerald-900">
-          <span className="text-sm text-gray-500">
-            이번 달 총액{recommended.unknownPriceCount > 0 && " (최소)"}
-          </span>
-          <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-            {formatKRW(recommended.totalThisMonth)}
-            {recommended.unknownPriceCount > 0 && (
-              <span className="text-base font-semibold"> +α</span>
-            )}
-          </span>
+        <div className="mt-3 flex flex-col gap-1 border-t border-emerald-200/70 pt-3 dark:border-emerald-900">
+          {/* 사용자가 실제로 궁금한 값: "이거 보려고 돈을 더 내야 하나?" */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm text-gray-500">추가 지출</span>
+            <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+              {formatKRW(recommended.additionalCost)}
+              {recommended.unknownPriceCount > 0 && (
+                <span className="text-base font-semibold"> +α</span>
+              )}
+            </span>
+            {recommended.additionalCost === 0 &&
+              recommended.unknownPriceCount === 0 && (
+                <span className="text-sm text-gray-500">
+                  지금 구독으로 다 볼 수 있어요
+                </span>
+              )}
+          </div>
+
+          {/* 조합 자체의 비용 — 이미 내고 있는 구독료를 포함한 값 */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-gray-400">
+              이 조합의 월 비용{recommended.unknownPriceCount > 0 && " (최소)"}
+            </span>
+            <span className="text-sm font-medium text-gray-500">
+              {formatKRW(recommended.totalThisMonth)}
+              {recommended.unknownPriceCount > 0 && " +α"}
+              {recommended.monthlyCost > 0 &&
+                recommended.additionalCost < recommended.totalThisMonth &&
+                " · 이미 내고 있는 구독료 포함"}
+            </span>
+          </div>
         </div>
 
         {recommended.unknownPriceCount > 0 && (
