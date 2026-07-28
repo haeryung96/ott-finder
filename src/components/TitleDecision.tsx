@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { ProviderSource } from "@/components/ProviderSource";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
 import { tmdbImage } from "@/lib/image";
 import { bestValue, formatKRW, type BestValue } from "@/lib/pricing";
@@ -144,7 +145,11 @@ export function TitleDecision({
       {/* 제공처 breakdown */}
       {hasAnySection ? (
         <div className="flex flex-col gap-5">
-          <h2 className="text-base font-semibold">볼 수 있는 곳</h2>
+          <h2 className="flex flex-wrap items-baseline gap-2 text-base font-semibold">
+            볼 수 있는 곳
+            {/* 제공처를 표시하는 항목마다 출처 표기 (약관 요구사항) */}
+            <ProviderSource />
+          </h2>
           {SECTIONS.map((section) => {
             const list = providers?.[section.key] ?? [];
             if (list.length === 0) return null;

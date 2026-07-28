@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { ProviderSource } from "@/components/ProviderSource";
 import { tmdbImage } from "@/lib/image";
 import { dedupeProviders } from "@/lib/providers";
 import type { TmdbProvider, TmdbRegionProviders } from "@/types/tmdb";
@@ -67,6 +68,8 @@ export function ProviderStrip({
       {extra > 0 && (
         <span className="text-[11px] font-medium text-gray-400">+{extra}</span>
       )}
+      {/* 제공처를 표시하는 항목마다 출처 표기 (약관 요구사항) */}
+      <ProviderSource compact />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DataAttribution } from "@/components/DataAttribution";
 import { TitleDecision } from "@/components/TitleDecision";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { mergeAvailability } from "@/lib/availability";
@@ -261,7 +262,9 @@ export default async function TitlePage({ params }: Params) {
             이동합니다. 딥링크를 못 불러온 경우엔 &ldquo;보러 가기&rdquo;(서비스
             검색)로 대체돼요.
           </p>
-          <p className="mt-1">데이터 제공: TMDB / JustWatch · 개인 학습용 프로젝트</p>
+          <div className="mt-1 flex flex-col gap-1">
+            <DataAttribution />
+          </div>
         </footer>
       </div>
     </main>

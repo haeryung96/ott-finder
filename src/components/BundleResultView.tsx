@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { ProviderSource } from "@/components/ProviderSource";
 import type { BundleResult, RentPlan } from "@/lib/bundle";
 import { tmdbImage } from "@/lib/image";
 import { formatKRW } from "@/lib/pricing";
@@ -149,7 +150,10 @@ export function BundleResultView({ result }: { result: BundleResult }) {
       {/* 상세 내역 */}
       <div className="flex flex-col gap-4">
         {coveredBySubscription.length > 0 && (
-          <Section title={`구독으로 볼 수 있어요 (${coveredBySubscription.length})`}>
+          <Section
+            title={`구독으로 볼 수 있어요 (${coveredBySubscription.length})`}
+            showSource
+          >
             {coveredBySubscription.map(({ title, via }) => (
               <Row
                 key={`${title.mediaType}-${title.id}`}
@@ -168,7 +172,7 @@ export function BundleResultView({ result }: { result: BundleResult }) {
         )}
 
         {watchFree.length > 0 && (
-          <Section title={`구독 없이 0원 (${watchFree.length})`}>
+          <Section title={`구독 없이 0원 (${watchFree.length})`} showSource>
             {watchFree.map((t) => (
               <Row
                 key={`${t.mediaType}-${t.id}`}
@@ -227,14 +231,18 @@ export function BundleResultView({ result }: { result: BundleResult }) {
 function Section({
   title,
   children,
+  showSource = false,
 }: {
   title: string;
   children: React.ReactNode;
+  /** 제공처 이름을 노출하는 섹션이면 출처를 표기한다 (약관 요구사항) */
+  showSource?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <h3 className="flex flex-wrap items-baseline gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
         {title}
+        {showSource && <ProviderSource />}
       </h3>
       <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
         {children}
