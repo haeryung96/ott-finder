@@ -104,13 +104,13 @@ export function TitleDecision({
 }) {
   const { tmdbIds, isLoaded, slugs } = useSubscriptions();
 
-  // 하이드레이션 전에는 구독 정보를 모르므로 빈 Set 으로 계산했다가 로드 후 갱신됨
-  const bv = bestValue(
-    providers,
-    isLoaded ? tmdbIds : new Set<number>(),
-    jwOffers,
-  );
-  const { text, sub, tone } = headline(bv);
+  // 하이드레이션 전에는 내 구독을 모른다. 빈 Set 으로 계산해 버리면 구독 중인
+  // 서비스에 있는 작품이 "대여 ₩1,300" 으로 뜬다 — 모르는 걸 단정하는 셈이다.
+  // 알기 전까지는 결론 대신 자리만 잡아둔다.
+  const bv = isLoaded ? bestValue(providers, tmdbIds, jwOffers) : null;
+  const { text, sub, tone } = bv
+    ? headline(bv)
+    : { text: "", sub: "", tone: "gray" };
 
   const offerMap = toOfferMap(jwOffers);
   const hasAnySection = SECTIONS.some(
@@ -126,8 +126,17 @@ export function TitleDecision({
       {/* 결론 배너 */}
       <div className={`rounded-2xl border p-5 ${TONE[tone]}`}>
         <p className="text-xs font-medium text-gray-500">가장 싸게 보는 법</p>
-        <p className="mt-1 text-xl font-bold tracking-tight">{text}</p>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{sub}</p>
+        {bv ? (
+          <>
+            <p className="mt-1 text-xl font-bold tracking-tight">{text}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{sub}</p>
+          </>
+        ) : (
+          <div aria-hidden className="mt-2 flex flex-col gap-2">
+            <div className="h-6 w-2/3 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+          </div>
+        )}
 
         {isLoaded && slugs.length === 0 && (
           <p className="mt-3 text-sm">

@@ -22,8 +22,12 @@ function statusPill(
   providers: SearchItemWithProviders["providers"],
   subscribedIds?: Set<number>,
 ): Pill {
+  // 내 구독을 아직 모르면 배지를 달지 않는다. 여기서 단정하면 "바로 보기"여야 할
+  // 작품에 "구독"이 붙는다 (구독 정보 없이 계산하면 내 구독이 남의 구독이 된다).
+  if (subscribedIds === undefined) return null;
+
   const flatrate = providers?.flatrate ?? [];
-  const mine = flatrate.some((p) => subscribedIds?.has(p.provider_id));
+  const mine = flatrate.some((p) => subscribedIds.has(p.provider_id));
   if (mine)
     return {
       label: "바로 보기",

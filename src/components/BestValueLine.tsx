@@ -14,6 +14,11 @@ function names(list: TmdbProvider[], max = 2): string {
 /**
  * 카드에 표시되는 "가장 싸게 보는 법" 한 줄 결론.
  * 금액은 JustWatch 실측가만 쓰고, 모르면 숫자 없이 경로만 알린다.
+ *
+ * `subscribedIds` 가 undefined 면 **아직 내 구독을 모르는 상태**(하이드레이션 전)다.
+ * 이때 결론을 내면 안 된다 — 구독을 모른 채 계산하면 wavve 로 공짜로 볼 수 있는
+ * 작품에 "대여 ₩1,300" 이 뜬다. 실제로 그랬다.
+ * v0.4.0 의 원칙("모르면 표시하지 않는다")은 가격뿐 아니라 구독 상태에도 적용된다.
  */
 export function BestValueLine({
   providers,
@@ -21,10 +26,20 @@ export function BestValueLine({
   offers,
 }: {
   providers?: TmdbRegionProviders;
+  /** undefined = 아직 모름(하이드레이션 전). 빈 Set = 구독 중인 서비스가 없음 */
   subscribedIds?: Set<number>;
   offers?: JwOffer[] | null;
 }) {
-  const bv = bestValue(providers, subscribedIds ?? new Set(), offers);
+  if (subscribedIds === undefined) {
+    return (
+      <p
+        aria-hidden
+        className="h-4 w-2/3 animate-pulse rounded bg-gray-200 dark:bg-gray-800"
+      />
+    );
+  }
+
+  const bv = bestValue(providers, subscribedIds, offers);
 
   if (bv.kind === "unavailable") return null;
 

@@ -7,7 +7,7 @@
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)
-![version](https://img.shields.io/badge/version-0.4.1-3fb950)
+![version](https://img.shields.io/badge/version-0.4.2-3fb950)
 
 <p align="center">
   <img src="docs/screenshots/01-home.jpg" alt="OTT Finder 시작 화면" width="820">
