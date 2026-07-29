@@ -233,11 +233,38 @@ OTT Finder의 차별점:
     - Suspense 는 그대로 뒀다. 스트리밍 스켈레톤은 그대로 쓰는 게 맞고,
       진짜 문제는 "모르는 걸 단정한 것"이지 Suspense 가 아니었다.
 
+- [x] **v0.4.3 — vitest + 회귀 테스트 72개** (2026-07-29) — 동작 확인 완료
+  - 설정: `vitest.config.mts` (jsdom, `resolve.tsconfigPaths: true`).
+    Next 문서가 안내하는 `vite-tsconfig-paths` 는 Vite 가 이 옵션을 내장해서 빼도 된다.
+  - `npm test` = `vitest run`, `npm run test:watch` = watch 모드.
+  - 대상은 **순수 함수 + 결론을 렌더하는 컴포넌트**. 외부 API 호출(`tmdb.ts`,
+    `justwatch.ts`)은 모킹해도 스키마 변경을 못 잡으므로 이번 범위에서 제외했다.
+    (JustWatch 응답 파싱은 실제 fixture 를 떠와야 의미가 있어 별도 과제)
+  - **지금까지 실제로 났던 버그를 전부 회귀 케이스로 고정했다:**
+    | 버그 | 테스트 |
+    |---|---|
+    | v0.2.0 free/ads 무시 → 0원인데 "대여 ₩5,500" | `pricing.test.ts` |
+    | v0.2.0 광고형 요금제(1796) alias | `pricing.test.ts` · `providers.test.ts` |
+    | v0.2.0 무료 작품이 조합에서 불필요한 구독 강제 | `bundle.test.ts` |
+    | v0.4.0 추정치 폐기 (모르면 null) | `pricing.test.ts` · `bundle.test.ts` |
+    | v0.4.0 대여 vs 구매 실제 비교 | `pricing.test.ts` |
+    | v0.4.1 TMDB KR 구멍 → JustWatch 합집합 | `availability.test.ts` |
+    | v0.4.1 `additionalCost` (이미 낸 구독료 제외) | `bundle.test.ts` |
+    | v0.4.2 하이드레이션 전 틀린 결론 (문구) | `BestValueLine.test.tsx` |
+    | v0.4.2 하이드레이션 전 틀린 결론 (배지) | `ResultCard.test.tsx` |
+    | v0.4.2 항목별 JustWatch 출처 표기 | `ResultCard.test.tsx` |
+  - **테스트가 실제로 버그를 잡는지 검증했다** — 고친 코드를 하나씩 되돌려 실패를 확인:
+    v0.4.2 가드 제거 → 3건 실패, free/ads 우선순위 제거 → 2건 실패,
+    합집합 병합 제거 → 5건 실패, 배지 가드 제거 → 1건 실패.
+    통과만 확인하면 무의미한 테스트를 짚어낼 수 없다.
+  - `bundle.test.ts` 에 **greedy 가 놓치는 케이스**를 넣었다.
+    netflix(2편 커버)를 먼저 잡으면 ₩24,400 이지만 실제 최적은 watcha+wavve ₩18,800 이다.
+    완전탐색이라는 선택이 실제로 값을 하는지 고정한다.
+  - 순수 함수라 빠르다 — 72개 0.6초.
+
 **다음 할 일:**
 - [ ] **JustWatch 실패를 감지할 방법이 없음** — 지금은 조용히 금액만 사라진다.
       실패율 로깅/알림이 없으면 스키마가 바뀌어도 한동안 모른다. 우선순위 높음
-- [ ] **테스트 없음** — `bundle.ts`(set cover)·`pricing.ts`는 순수 함수라 vitest 도입 1순위.
-      JustWatch 응답 파싱도 고정 fixture 로 테스트해두면 스키마 변경을 바로 잡을 수 있음
 - [ ] 구독 월정액(`subscriptions.json`)은 **여전히 수동 관리 seed** — 유일하게 남은 비실측
       데이터. 요금제 개편 때 갱신 필요 (JustWatch 는 구독 월정액을 주지 않음)
 - [ ] 검색 응답이 항목당 2개 API 를 타므로 느려질 수 있음 — 스트리밍/부분 렌더 검토

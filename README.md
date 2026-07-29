@@ -7,7 +7,8 @@
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)
-![version](https://img.shields.io/badge/version-0.4.2-3fb950)
+![version](https://img.shields.io/badge/version-0.4.3-3fb950)
+![tests](https://img.shields.io/badge/tests-72%20passing-3fb950?logo=vitest&logoColor=white)
 
 <p align="center">
   <img src="docs/screenshots/01-home.jpg" alt="OTT Finder 시작 화면" width="820">
@@ -175,7 +176,39 @@ src/
   data/
     subscriptions.json  # 구독 월정액 카탈로그 (유일한 수동 seed)
     watch-links.json    # 딥링크 실패 시 쓰는 서비스 검색 URL
+  test/fixtures.ts   # 테스트 픽스처 빌더 (실제 TMDB provider_id 사용)
+  **/*.test.ts(x)    # 테스트는 대상 파일 옆에 둠
 ```
+
+---
+
+## 테스트
+
+```bash
+npm test          # vitest run (72개, 약 0.6초)
+npm run test:watch
+```
+
+대상은 **순수 함수와 결론을 렌더하는 컴포넌트**입니다. 외부 API 호출(`tmdb.ts`, `justwatch.ts`)은 모킹해도 정작 위험한 스키마 변경을 잡지 못하므로 범위에서 뺐습니다.
+
+테스트는 **지금까지 실제로 났던 버그를 회귀 케이스로 고정**한 것입니다.
+
+| 버그 | 테스트 |
+|---|---|
+| free/ads를 무시해 0원인데 "대여 ₩5,500"이 뜸 (v0.2.0) | `pricing.test.ts` |
+| 광고형 요금제(`1796`)가 별도 id라 구독자가 "구독 필요"를 봄 (v0.2.0) | `pricing` · `providers` |
+| 무료 작품 때문에 조합이 불필요한 구독을 강제 추천 (v0.2.0) | `bundle.test.ts` |
+| 추정치 폐기 — 모르면 `null` (v0.4.0) | `pricing` · `bundle` |
+| 대여 vs 구매를 실제 금액으로 비교 (v0.4.0) | `pricing.test.ts` |
+| TMDB KR 제공처 구멍 → JustWatch 합집합 (v0.4.1) | `availability.test.ts` |
+| `additionalCost` — 이미 낸 구독료 제외 (v0.4.1) | `bundle.test.ts` |
+| 하이드레이션 전 틀린 결론 — 결론 문구 (v0.4.2) | `BestValueLine.test.tsx` |
+| 하이드레이션 전 틀린 결론 — 상태 배지 (v0.4.2) | `ResultCard.test.tsx` |
+| 항목별 JustWatch 출처 표기 (v0.4.2) | `ResultCard.test.tsx` |
+
+**테스트가 실제로 버그를 잡는지도 검증했습니다.** 고친 코드를 하나씩 되돌려 빨간불을 확인했습니다 — v0.4.2 가드 제거 시 3건, free/ads 우선순위 제거 시 2건, 합집합 병합 제거 시 5건 실패. 통과만 보고 넘기면 아무것도 검증하지 않는 테스트를 걸러낼 수 없습니다.
+
+`bundle.test.ts`에는 **greedy가 놓치는 케이스**를 넣었습니다. 가장 많이 덮는 Netflix를 먼저 잡으면 ₩24,400이지만 실제 최적은 Watcha + wavve로 ₩18,800입니다. 완전탐색을 고른 게 실제로 값을 하는지 고정합니다.
 
 ---
 
@@ -215,7 +248,7 @@ TMDB 키는 [themoviedb.org/settings/api](https://www.themoviedb.org/settings/ap
 ## 알려진 한계 / 다음 할 일
 
 - [ ] **JustWatch 실패를 감지할 방법이 없음** — 지금은 조용히 금액만 사라집니다. 실패율 로깅/알림 필요 (우선순위 높음)
-- [ ] **테스트 없음** — `bundle.ts`(set cover), `pricing.ts`는 순수 함수라 vitest 도입 1순위. JustWatch 응답 파싱은 고정 fixture로 스키마 변경을 잡을 수 있음
+- [ ] JustWatch 응답 파싱은 아직 테스트가 없음 — 실제 응답 fixture를 떠와야 스키마 변경을 잡을 수 있음
 - [ ] 검색 응답이 항목당 API 2개를 타므로 느려질 수 있음 — 스트리밍/부분 렌더 검토
 - [ ] 검색 디바운스·자동완성, 페이지네이션 (현재 20건 고정)
 - [ ] 배포 안 됨
